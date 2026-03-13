@@ -1,0 +1,76 @@
+{
+  "projectType": "general",
+  "projectName": "TokenStash",
+  "projectDescription": "A Claude Code plugin that caches project context locally so Claude starts every session already knowing your codebase.",
+  "theme": "palm",
+  "primaryColor": "#8B5CF6",
+  "lightColor": "#A78BFA",
+  "darkColor": "#6D28D9",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Get Started",
+        "pages": [
+          "introduction",
+          "installation",
+          "quickstart"
+        ]
+      },
+      {
+        "group": "Core Concepts",
+        "pages": [
+          "concepts/how-it-works",
+          "concepts/stash-structure",
+          "concepts/stash-locations",
+          "concepts/lifecycle"
+        ]
+      },
+      {
+        "group": "Commands",
+        "pages": [
+          "commands/overview",
+          "commands/stash-save",
+          "commands/stash-scan",
+          "commands/stash-clear"
+        ]
+      },
+      {
+        "group": "Guides",
+        "pages": [
+          "guides/first-time-setup",
+          "guides/daily-workflow",
+          "guides/best-practices",
+          "guides/troubleshooting"
+        ]
+      },
+      {
+        "group": "Reference",
+        "pages": [
+          "reference/hooks",
+          "reference/skills",
+          "reference/file-format"
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Automatic context caching across sessions",
+    "Session-based decision logging",
+    "Full repository scanning and indexing",
+    "Per-file summary tracking",
+    "Global and project-level stash support",
+    "Hook-based automation on file edits",
+    "AI-powered skill system"
+  ],
+  "publicApiSurface": [
+    "/stash-save - Save session summary to TokenStash",
+    "/stash-scan - Scan repo and build full index",
+    "/stash-scan --force - Re-scan all files and overwrite summaries",
+    "/stash-clear - Wipe project stash with confirmation",
+    "SessionStart hook - Inject stash context at session start",
+    "PostToolUse hook - Auto-update file summaries after edits",
+    "tokenstash:save skill - Full session save workflow",
+    "tokenstash:scan skill - Repository scanning workflow",
+    "tokenstash:auto-update skill - File summary update workflow"
+  ]
+}
