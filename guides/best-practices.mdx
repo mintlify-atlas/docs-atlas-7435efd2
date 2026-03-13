@@ -1,0 +1,547 @@
+---
+title: Best Practices
+description: Get the most out of TokenStash with these optimization tips
+---
+
+TokenStash works automatically, but following these best practices will help you build better context and get more value from the plugin.
+
+## Stash Hygiene
+
+### Save Regularly
+
+Run `/stash-save` at logical breakpoints:
+
+<CardGroup cols={2}>
+  <Card title="After completing a feature" icon="check">
+    Capture implementation decisions while fresh
+  </Card>
+  
+  <Card title="Before switching contexts" icon="arrow-right-arrow-left">
+    Preserve progress before changing tasks
+  </Card>
+  
+  <Card title="After architectural changes" icon="building">
+    Document structural modifications
+  </Card>
+  
+  <Card title="At end of work sessions" icon="calendar-xmark">
+    Ensure next session has full context
+  </Card>
+</CardGroup>
+
+<Tip>
+**Rule of thumb:** If you'd write a git commit message about it, you should probably `/stash-save` too.
+</Tip>
+
+### Keep Decisions Concise
+
+When `/stash-save` runs, it adds to `decisions.md`. Keep entries focused:
+
+<Accordion title="Good decision entry">
+```markdown
+## 2026-03-13 — Implemented caching layer
+
+**Decisions:**
+- Used Redis over in-memory cache for multi-instance support
+- TTL set to 5 minutes for user session data
+- Cache invalidation on write operations
+
+**Files changed:** src/cache/redis.ts, src/services/user.ts
+```
+
+**Why it's good:**
+- Clear one-line summary
+- Explains *why* (not just *what*)
+- Lists affected files
+- 3-5 bullet points
+</Accordion>
+
+<Accordion title="Poor decision entry">
+```markdown
+## 2026-03-13 — Updated code
+
+**Decisions:**
+- Added Redis
+- Fixed bugs
+- Made improvements
+
+**Files changed:** (many files)
+```
+
+**Why it's poor:**
+- Vague summary ("updated code")
+- No explanation of *why*
+- No specific files listed
+- No actionable information
+</Accordion>
+
+### Maintain rules.md
+
+Create `.tokenstash/rules.md` for project conventions:
+
+```markdown
+## Code Style
+- Use TypeScript strict mode
+- Prefer `const` over `let`
+- Max function length: 50 lines
+
+## Architecture
+- No direct database calls from controllers
+- All external API calls go through service layer
+- Use repository pattern for data access
+
+## Testing
+- Unit test coverage minimum: 80%
+- Integration tests for all API endpoints
+- Mock external services in tests
+
+## Naming Conventions
+- React components: PascalCase
+- Utilities: camelCase
+- Constants: UPPER_SNAKE_CASE
+```
+
+<Warning>
+`rules.md` is not auto-updated. Review and update it quarterly or when conventions change.
+</Warning>
+
+## Scanning Strategies
+
+### Initial Scan Best Practices
+
+When first scanning a project:
+
+<Steps>
+  <Step title="Clean up first">
+    Remove build artifacts, temp files:
+    
+    ```bash
+    git clean -fdx  # Remove untracked files
+    ```
+  </Step>
+
+  <Step title="Run the scan">
+    ```bash
+    /stash-scan
+    ```
+  </Step>
+
+  <Step title="Review architecture.md">
+    Check if the generated architecture overview is accurate. Edit manually if needed.
+  </Step>
+
+  <Step title="Verify file summaries">
+    Spot-check a few files in `.tokenstash/files/` to ensure quality.
+  </Step>
+</Steps>
+
+### When to Use --force
+
+Re-scan with `--force` in these situations:
+
+| Scenario | Command | Reason |
+|----------|---------|--------|
+| Major refactoring | `/stash-scan --force` | Old summaries may be stale |
+| After merging large PRs | `/stash-scan --force` | Many files changed |
+| Stash feels "wrong" | `/stash-scan --force` | Reset to clean state |
+| Changed git branches | `/stash-scan --force` | Different codebase structure |
+
+<Note>
+`--force` overwrites all existing summaries. Use sparingly — normal scans skip already-summarized files.
+</Note>
+
+### Exclude Large Files
+
+TokenStash automatically skips files over 500 lines. For large codebases:
+
+<Accordion title="Option 1: Break up large files">
+  Refactor monolithic files into smaller modules. This improves both stash quality and code maintainability.
+</Accordion>
+
+<Accordion title="Option 2: Manually summarize">
+  For unavoidable large files, write a summary manually:
+  
+  ```bash
+  # Create summary for large file
+  echo "**Purpose:** Core application state management
+**Key exports:** AppState, reducer, actions
+**Patterns:** Redux-style reducer with immer
+**Last updated:** 2026-03-13" > .tokenstash/files/src__store__index.md
+  ```
+</Accordion>
+
+## Architecture Documentation
+
+### Keep architecture.md Current
+
+Update `architecture.md` when structure changes significantly:
+
+<CardGroup cols={2}>
+  <Card title="New module added" icon="plus">
+    Add to "Key Components" section
+  </Card>
+  
+  <Card title="Pattern changed" icon="rotate">
+    Update "Patterns" section
+  </Card>
+  
+  <Card title="Tech stack update" icon="layer-group">
+    Update "Tech Stack" section
+  </Card>
+  
+  <Card title="Architecture shift" icon="building">
+    Rewrite "Architecture Overview"
+  </Card>
+</CardGroup>
+
+<Tip>
+Run `/stash-save` after major changes — it auto-updates `architecture.md` if it detects structural changes.
+</Tip>
+
+### Good Architecture Documentation
+
+<Accordion title="Example: Well-structured architecture.md">
+```markdown
+## Architecture Overview
+Event-driven microservices architecture. Services communicate via RabbitMQ. Each service has its own PostgreSQL database. Frontend is a React SPA with TypeScript.
+
+## Key Components
+- `services/auth/`: JWT authentication service (port 3001)
+- `services/orders/`: Order processing and fulfillment (port 3002)
+- `services/notifications/`: Email/SMS notifications (port 3003)
+- `web/`: React frontend application
+- `shared/`: Shared types and utilities (npm workspace)
+
+## Patterns
+- CQRS: Separate read/write models in order service
+- Event sourcing: Order state changes emit events
+- Repository pattern: All database access abstracted
+- Factory functions: Service initialization
+
+## Tech Stack
+- Node.js 20, TypeScript 5.3
+- PostgreSQL 15, RabbitMQ 3.12
+- React 18, Vite 5
+- Jest, Supertest, React Testing Library
+```
+
+**Why it's good:**
+- Clear 2-3 sentence overview
+- Specific component descriptions with locations
+- Real patterns used (not generic)
+- Complete tech stack with versions
+</Accordion>
+
+## File Summary Quality
+
+### What Makes a Good Summary
+
+Auto-generated summaries should be:
+
+<CardGroup cols={2}>
+  <Card title="Concise" icon="minimize">
+    3-5 lines maximum
+  </Card>
+  
+  <Card title="Specific" icon="bullseye">
+    List actual exports, not generic descriptions
+  </Card>
+  
+  <Card title="Focused" icon="crosshairs">
+    Purpose and key exports only
+  </Card>
+  
+  <Card title="Current" icon="clock">
+    Last updated date reflects recent changes
+  </Card>
+</CardGroup>
+
+<Accordion title="Good file summary">
+```markdown
+**Purpose:** Validates user input and sanitizes data before database operations.
+**Key exports:** `validateEmail`, `validatePassword`, `sanitizeInput`, `ValidationError`
+**Patterns:** Throws custom error classes, uses regex for validation.
+**Last updated:** 2026-03-13
+```
+</Accordion>
+
+<Accordion title="Poor file summary">
+```markdown
+**Purpose:** Has some utility functions.
+**Key exports:** Exports some functions.
+**Patterns:** Uses functions.
+**Last updated:** 2026-03-13
+```
+
+**Problems:**
+- Too generic ("some functions")
+- No specific exports listed
+- No useful pattern information
+</Accordion>
+
+### Manual Summary Editing
+
+Sometimes auto-generated summaries need tweaking:
+
+<Steps>
+  <Step title="Find the summary">
+    Summaries are in `.tokenstash/files/` with path separators replaced by `__`:
+    
+    ```
+    src/api/users.ts → .tokenstash/files/src__api__users.md
+    ```
+  </Step>
+
+  <Step title="Edit the file">
+    Open and improve the summary:
+    
+    ```markdown
+    **Purpose:** REST API endpoints for user CRUD operations.
+    **Key exports:** `GET /users`, `POST /users`, `PUT /users/:id`, `DELETE /users/:id`
+    **Patterns:** Express router with async middleware, validates with Joi.
+    **Last updated:** 2026-03-13
+    ```
+  </Step>
+
+  <Step title="Prevent overwrite">
+    The summary won't be overwritten unless:
+    - You run `/stash-scan --force`
+    - You edit the original file (which triggers auto-update)
+  </Step>
+</Steps>
+
+## Global vs Project Stash
+
+### When to Use Global Stash
+
+Store in `~/.claude/tokenstash/` for:
+
+<CardGroup cols={2}>
+  <Card title="Personal preferences" icon="user">
+    Your coding style and conventions
+  </Card>
+  
+  <Card title="Common patterns" icon="repeat">
+    Patterns you use across projects
+  </Card>
+  
+  <Card title="Template rules" icon="file-lines">
+    General rules applicable everywhere
+  </Card>
+  
+  <Card title="Tool configurations" icon="wrench">
+    How you prefer to use certain tools
+  </Card>
+</CardGroup>
+
+<Accordion title="Example: Global rules.md">
+```markdown
+## My Coding Style
+- Always use TypeScript
+- Prefer functional over imperative
+- Write self-documenting code
+- Test coverage: minimum 80%
+
+## My Preferences
+- Use pnpm over npm
+- Prefer Vitest over Jest for new projects
+- React: functional components + hooks only
+
+## Documentation
+- JSDoc comments for all exported functions
+- README.md in every package
+- Include examples in documentation
+```
+</Accordion>
+
+### Project Stash Takes Precedence
+
+Remember: Project stash overrides global stash.
+
+```bash
+# If both exist:
+~/.claude/tokenstash/rules.md         # Applied first
+<repo>/.tokenstash/rules.md           # Overrides global
+```
+
+<Tip>
+Use global stash for your personal style, project stash for team conventions. This way your preferences apply unless the project specifies otherwise.
+</Tip>
+
+## Team Collaboration
+
+### Commit Strategy
+
+**Recommended:** Commit `.tokenstash/` to git.
+
+**Benefits:**
+- New team members get instant context
+- Everyone shares architecture knowledge
+- Decision history is preserved
+- No need for separate documentation
+
+**Best practices:**
+
+<Steps>
+  <Step title="Include in commits">
+    ```bash
+    git add .tokenstash/
+    git commit -m "feat: add auth system + update stash"
+    ```
+  </Step>
+
+  <Step title="Review stash in PRs">
+    Check `.tokenstash/` changes in code reviews. They show what changed at a high level.
+  </Step>
+
+  <Step title="Resolve conflicts">
+    Merge conflicts in stash files just like documentation. Usually safe to pick either version or merge manually.
+  </Step>
+</Steps>
+
+### Team Guidelines
+
+Establish team conventions:
+
+1. **Everyone runs `/stash-save`** after significant work
+2. **Review `decisions.md`** in team meetings
+3. **Keep `rules.md` updated** with agreed conventions
+4. **Initial scan** by first team member setting up project
+5. **Force re-scan quarterly** to keep summaries fresh
+
+<Warning>
+If stash updates are inconsistent, the context becomes fragmented. Make `/stash-save` part of your team's workflow.
+</Warning>
+
+## Performance Optimization
+
+### Reduce Stash Size
+
+For very large codebases:
+
+<Accordion title="Exclude generated code">
+  Add to `.gitignore`:
+  
+  ```
+  dist/
+  build/
+  .next/
+  coverage/
+  ```
+  
+  TokenStash respects gitignore and won't scan these directories.
+</Accordion>
+
+<Accordion title="Skip test files (optional)">
+  If test files clutter your stash, you can manually delete their summaries:
+  
+  ```bash
+  rm .tokenstash/files/**__test.md
+  rm .tokenstash/files/**__spec.md
+  ```
+  
+  They won't regenerate unless you edit them or run `--force`.
+</Accordion>
+
+<Accordion title="Periodic cleanup">
+  Remove summaries for deleted files:
+  
+  ```bash
+  /stash-scan --force
+  ```
+  
+  This cleans up orphaned summaries.
+</Accordion>
+
+## Advanced Tips
+
+### Use Stash as Documentation Hub
+
+Leverage the stash beyond code summaries:
+
+- **API contracts:** Document endpoints in relevant file summaries
+- **Configuration:** Note environment variables in architecture.md
+- **Dependencies:** List critical dependencies and why they were chosen
+- **Known issues:** Add to decisions.md when working around limitations
+
+### Stash-Driven Development
+
+Use the stash to guide your work:
+
+1. **Before coding:** Check `architecture.md` to understand existing patterns
+2. **During coding:** File summaries update automatically
+3. **After coding:** Run `/stash-save` to document decisions
+4. **Code review:** Read `decisions.md` to understand reasoning
+
+<Tip>
+Treat your stash like living documentation. It should tell the story of your project's evolution.
+</Tip>
+
+### Context Refresh
+
+If Claude seems to have stale context:
+
+```bash
+/stash-save      # Save current state
+# Restart Claude Code session
+# Stash is re-injected with latest content
+```
+
+The fresh session loads the updated stash.
+
+## Common Pitfalls to Avoid
+
+<Warning>
+**Pitfall 1: Forgetting to save**
+
+Running `/stash-save` is manual. If you forget, decisions aren't captured.
+
+**Solution:** Make it a habit at the end of every session.
+</Warning>
+
+<Warning>
+**Pitfall 2: Stale architecture.md**
+
+If you rarely update `architecture.md`, it becomes outdated.
+
+**Solution:** Review and update quarterly, or after major changes.
+</Warning>
+
+<Warning>
+**Pitfall 3: Too much detail**
+
+Writing verbose summaries defeats the purpose.
+
+**Solution:** Keep summaries under 5 lines. Focus on *what* and *why*, not *how*.
+</Warning>
+
+<Warning>
+**Pitfall 4: Ignoring global stash**
+
+Not using global stash means repeating yourself across projects.
+
+**Solution:** Put personal preferences in `~/.claude/tokenstash/rules.md`.
+</Warning>
+
+## Checklist: Am I Using TokenStash Well?
+
+- [ ] Run `/stash-save` at least once per work session
+- [ ] `decisions.md` has clear, concise entries
+- [ ] `architecture.md` reflects current structure
+- [ ] `rules.md` exists and is up-to-date
+- [ ] File summaries are under 5 lines each
+- [ ] Stash is committed to git (if team project)
+- [ ] Global stash contains personal preferences
+- [ ] Periodic `/stash-scan --force` to refresh
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Troubleshooting" icon="wrench" href="/guides/troubleshooting">
+    Fix common issues with TokenStash
+  </Card>
+  
+  <Card title="Commands Reference" icon="terminal" href="/commands/overview">
+    Complete command documentation
+  </Card>
+</CardGroup>

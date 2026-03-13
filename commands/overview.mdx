@@ -1,0 +1,122 @@
+---
+title: Commands Overview
+description: All available TokenStash slash commands for managing your project context cache
+---
+
+TokenStash provides slash commands to control how your project context is saved, scanned, and managed.
+
+## Available Commands
+
+<CardGroup cols={2}>
+  <Card title="/stash-save" icon="floppy-disk" href="/commands/stash-save">
+    Save session summary with decisions, architecture, and file summaries
+  </Card>
+  
+  <Card title="/stash-scan" icon="magnifying-glass" href="/commands/stash-scan">
+    Scan the entire repository and build the TokenStash index
+  </Card>
+  
+  <Card title="/stash-clear" icon="trash" href="/commands/stash-clear">
+    Wipe the TokenStash for the current project
+  </Card>
+</CardGroup>
+
+## Command Usage
+
+All commands are invoked in Claude Code using the slash command syntax:
+
+```bash
+/command-name [flags]
+```
+
+<Note>
+Commands are designed to be run during or at the end of a coding session to capture context for future sessions.
+</Note>
+
+## When to Use Each Command
+
+### During Development
+
+**Auto-updates happen automatically** — TokenStash updates file summaries silently every time you edit a file. No manual intervention needed.
+
+### End of Session
+
+Run `/stash-save` to capture:
+- Decisions made during the session
+- Architecture changes
+- Summaries for files you worked with
+
+### Starting a New Project
+
+Run `/stash-scan` once to:
+- Index all files in the repository
+- Generate comprehensive architecture overview
+- Create initial file summaries
+
+### Forcing a Refresh
+
+Use `/stash-scan --force` when:
+- Project structure has changed significantly
+- You want to regenerate all summaries
+- Previous summaries seem outdated
+
+### Resetting Everything
+
+Use `/stash-clear` when:
+- Starting fresh with a different approach
+- The stash has become outdated or incorrect
+- Testing or debugging TokenStash itself
+
+## Stash Structure
+
+Commands write to `.tokenstash/` in your repository root:
+
+```
+.tokenstash/
+├── architecture.md    # High-level codebase overview
+├── decisions.md       # Session decision log
+├── rules.md          # Project-specific rules
+└── files/            # Per-file summaries
+    ├── src__index.md
+    ├── src__lib__utils.md
+    └── ...
+```
+
+<Tip>
+The stash is automatically loaded at the start of every Claude Code session, so Claude already knows your codebase.
+</Tip>
+
+## Command Behavior
+
+### Non-Invasive
+
+Commands are designed to be safe:
+- `/stash-save` and `/stash-scan` only write to `.tokenstash/`
+- `/stash-clear` asks for confirmation before deleting
+- No source code is modified
+
+### Git Aware
+
+Commands find your repository root automatically:
+- Uses `git rev-parse --show-toplevel`
+- Creates `.tokenstash/` at the repo root
+- Works in monorepos and nested directories
+
+### Efficient
+
+Commands avoid redundant work:
+- `/stash-scan` skips files that already have summaries
+- Use `--force` flag to override and re-scan everything
+- Auto-updates happen silently without interrupting flow
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Save Command" icon="floppy-disk" href="/commands/stash-save">
+    Learn how to save session summaries
+  </Card>
+  
+  <Card title="Scan Command" icon="magnifying-glass" href="/commands/stash-scan">
+    Index your entire repository
+  </Card>
+</CardGroup>

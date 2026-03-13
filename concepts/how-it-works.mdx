@@ -1,0 +1,147 @@
+---
+title: "How It Works"
+description: "Understand the TokenStash architecture and how it caches project context for Claude Code"
+---
+
+## Overview
+
+TokenStash is a Claude Code plugin that automatically caches project context so Claude starts every session already knowing your codebase. Instead of re-reading files and re-explaining architecture every time, Claude loads pre-built summaries from your stash.
+
+<Info>
+Think of TokenStash as a persistent memory layer that survives across Claude sessions. The more you work with it, the smarter it gets.
+</Info>
+
+## The Core System
+
+TokenStash operates through three main components:
+
+<CardGroup cols={3}>
+  <Card title="Hooks" icon="link">
+    Automatically inject and update stash at the right moments
+  </Card>
+  <Card title="Skills" icon="brain">
+    AI workflows that write summaries and maintain the stash
+  </Card>
+  <Card title="Commands" icon="terminal">
+    Manual controls for scanning, saving, and clearing
+  </Card>
+</CardGroup>
+
+### Session Start Hook
+
+Every time you start a new Claude Code session, the `session-start` hook runs automatically:
+
+```bash hooks/session-start:36-52
+# Load global stash
+if [ -d "$GLOBAL_STASH_DIR" ]; then
+    for f in preferences.md rules.md; do
+        fpath="$GLOBAL_STASH_DIR/$f"
+        if [ -f "$fpath" ]; then
+            context+="## Global: $f\n$(cat "$fpath")\n\n"
+        fi
+    done
+fi
+
+# Load project stash (takes priority)
+if [ -d "$PROJECT_STASH_DIR" ]; then
+    for f in architecture.md decisions.md rules.md; do
+        fpath="$PROJECT_STASH_DIR/$f"
+        if [ -f "$fpath" ]; then
+            context+="## Project: $f\n$(cat "$fpath")\n\n"
+        fi
+    done
+```
+
+This hook:
+1. Finds the global stash at `~/.claude/tokenstash/`
+2. Finds the project stash at `<repo-root>/.tokenstash/`
+3. Loads all markdown files from both locations
+4. Injects the combined context into Claude's initial prompt
+
+<Tip>
+The hook runs on `startup`, `resume`, `clear`, and `compact` events — meaning Claude always has fresh context when you start working.
+</Tip>
+
+### Post-Tool-Use Hook
+
+After you edit or write a file, the `post-tool-use` hook triggers automatically:
+
+```bash hooks/post-tool-use:21-31
+# Only act on Write and Edit tool calls with a file path
+if [[ "$tool_name" != "Write" && "$tool_name" != "Edit" ]] || [ -z "$file_path" ]; then
+    cat << 'JSONEOF'
+{"no_op": true}
+JSONEOF
+    exit 0
+fi
+
+filename=$(basename "$file_path")
+reminder="<tokenstash-reminder>You just edited \`${file_path}\`. Use the tokenstash:auto-update skill to update its summary in .tokenstash/files/ now.</tokenstash-reminder>"
+```
+
+This hook reminds Claude to update the file summary in `.tokenstash/files/` using the `tokenstash:auto-update` skill. The update happens silently in the background.
+
+## How Summaries Are Generated
+
+<Accordion title="Automatic Updates (After Each Edit)">
+  When you edit a file, Claude runs the `auto-update` skill to write a 3-5 line summary:
+
+  ```markdown
+  **Purpose:** One sentence — what this file does.
+  **Key exports:** List the main functions/classes/constants exported.
+  **Patterns:** Any notable patterns (e.g. "uses factory pattern", "singleton").
+  **Last updated:** YYYY-MM-DD
+  ```
+
+  File paths are flattened: `src/lib/utils.ts` → `src__lib__utils.md`
+</Accordion>
+
+<Accordion title="Manual Session Save">
+  When you run `/stash-save`, Claude:
+  1. Appends to `decisions.md` with what was decided and why
+  2. Updates `architecture.md` if the structure changed
+  3. Sweeps through all edited files and writes missing summaries
+</Accordion>
+
+<Accordion title="Full Repository Scan">
+  When you run `/stash-scan`, Claude:
+  1. Discovers all files in the repo (excluding `.git/`, `node_modules/`, etc.)
+  2. Summarizes each file under 500 lines
+  3. Writes `.tokenstash/files/<path>.md` for each
+  4. Generates an `architecture.md` overview from the full codebase
+
+  Use `--force` to overwrite existing summaries.
+</Accordion>
+
+## Data Flow
+
+```mermaid
+graph LR
+    A[Session Start] --> B[Load Global Stash]
+    B --> C[Load Project Stash]
+    C --> D[Inject into Claude Context]
+    D --> E[User Works]
+    E --> F{Edit File?}
+    F -->|Yes| G[Post-Tool-Use Hook]
+    G --> H[Auto-Update Summary]
+    H --> E
+    E --> I[/stash-save]
+    I --> J[Update decisions.md]
+    J --> K[Update architecture.md]
+    K --> L[Sweep File Summaries]
+```
+
+<Note>
+The stash is **read** at session start and **written** after edits or manual saves. This creates a continuous learning loop.
+</Note>
+
+## Why This Works
+
+Traditional approaches make Claude re-read files every session. TokenStash caches summaries that are:
+
+- **Persistent**: Survive across sessions
+- **Incremental**: Update as you work, not all at once
+- **Prioritized**: Project stash overrides global stash
+- **Compact**: 3-5 lines per file vs. reading full source
+
+The result: Claude starts knowing your codebase instantly, saving thousands of tokens per session.

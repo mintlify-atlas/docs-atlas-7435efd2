@@ -1,0 +1,269 @@
+---
+title: "Stash Structure"
+description: "Complete reference for what files go in .tokenstash/ and what each contains"
+---
+
+## Directory Structure
+
+The `.tokenstash/` directory contains all cached context for your project:
+
+```
+.tokenstash/
+├── architecture.md       # High-level codebase overview
+├── decisions.md          # Session decision log
+├── rules.md              # Project-specific rules
+└── files/                # Per-file summaries
+    ├── src__index.md
+    ├── src__lib__utils.md
+    └── tests__main.test.md
+```
+
+<Info>
+All stash files use Markdown format for human readability. You can view and edit them manually if needed.
+</Info>
+
+## Core Files
+
+<Accordion title="architecture.md" icon="sitemap">
+  ### Purpose
+  High-level overview of your codebase structure, key components, and patterns.
+
+  ### When It's Created
+  - First created during `/stash-scan`
+  - Updated during `/stash-save` if structure changed
+  - Manually editable anytime
+
+  ### Format
+  ```markdown
+  ## Architecture Overview
+  [2-4 sentences describing the overall structure]
+
+  ## Key Components
+  - `path/to/module`: what it does
+  - `path/to/module`: what it does
+
+  ## Patterns
+  - [notable patterns used]
+
+  ## Tech Stack
+  - [main technologies]
+  ```
+
+  ### Example
+  ```markdown
+  ## Architecture Overview
+  TokenStash is a Claude Code plugin built with Bash hooks and Markdown-based
+  skills. The core system uses hooks to inject context at session start and
+  update summaries after file edits.
+
+  ## Key Components
+  - `hooks/`: Session lifecycle hooks (session-start, post-tool-use)
+  - `skills/`: AI workflows for scanning, saving, and auto-updating
+  - `commands/`: User-facing slash commands
+
+  ## Patterns
+  - Hook-based event system for automatic context injection
+  - Flattened file paths for summary storage
+  - Priority override: project stash > global stash
+
+  ## Tech Stack
+  - Bash for hooks and file operations
+  - Claude Code plugin API
+  - Markdown for all persistent storage
+  ```
+
+  <Tip>
+  Keep `architecture.md` high-level. Don't document every file — that's what `files/` is for.
+  </Tip>
+</Accordion>
+
+<Accordion title="decisions.md" icon="check-circle">
+  ### Purpose
+  Chronological log of decisions made during sessions — what was decided and why.
+
+  ### When It's Written
+  - Appended to during `/stash-save`
+  - Each entry is timestamped with the session date
+
+  ### Format
+  ```markdown
+  ## YYYY-MM-DD — <one-line session summary>
+
+  **Decisions:**
+  - [What was decided and why]
+  - [Another decision if applicable]
+
+  **Files changed:** file1.ts, file2.py
+  ```
+
+  ### Example
+  ```markdown
+  ## 2026-03-12 — Added post-tool-use hook for automatic updates
+
+  **Decisions:**
+  - Hook now fires after Write and Edit tools to trigger auto-summary
+  - Use async execution to avoid blocking the user
+  - Skip no-op scenarios (other tools, missing file paths)
+
+  **Files changed:** hooks/post-tool-use, hooks/hooks.json
+
+  ## 2026-03-10 — Implemented flattened file path storage
+
+  **Decisions:**
+  - Replace `/` with `__` in file summaries to avoid nested directories
+  - Simplifies file discovery and reduces filesystem complexity
+  - Example: src/lib/utils.ts → src__lib__utils.md
+
+  **Files changed:** skills/scan/SKILL.md, skills/auto-update/SKILL.md
+  ```
+
+  <Note>
+  `decisions.md` is append-only. Never delete old entries — they provide historical context.
+  </Note>
+</Accordion>
+
+<Accordion title="rules.md" icon="gavel">
+  ### Purpose
+  Project-specific rules and conventions — think of it as "CLAUDE.md on steroids."
+
+  ### When It's Created
+  - Manually created by you or Claude
+  - Can be edited anytime to refine project rules
+
+  ### Format
+  Free-form Markdown. Common sections:
+  - Coding conventions
+  - Architecture principles
+  - Preferred libraries/patterns
+  - Things to avoid
+
+  ### Example
+  ```markdown
+  # Project Rules
+
+  ## Coding Style
+  - Use TypeScript strict mode
+  - Prefer functional patterns over classes
+  - All exports must have JSDoc comments
+
+  ## Testing
+  - Write tests alongside source in `__tests__/` subdirectories
+  - Use Vitest for unit tests
+  - Aim for 80%+ coverage on core logic
+
+  ## Architecture Principles
+  - Keep hooks simple — delegate complex logic to skills
+  - All persistent state lives in `.tokenstash/`
+  - No network calls in hooks (must be fast)
+
+  ## Dependencies
+  - Avoid adding npm dependencies — pure Bash preferred
+  - If needed, use built-in tools (python3, git, find)
+  ```
+
+  <Tip>
+  Use `rules.md` to teach Claude your project's unique conventions. This overrides Claude's defaults.
+  </Tip>
+</Accordion>
+
+## File Summaries Directory
+
+The `files/` subdirectory contains one Markdown file per source file:
+
+### Naming Convention
+
+File paths are **flattened** by replacing `/` with `__`:
+
+| Source File | Summary File |
+|-------------|-------------|
+| `src/index.ts` | `files/src__index.md` |
+| `lib/parser/tokenizer.js` | `files/lib__parser__tokenizer.md` |
+| `test/unit/hooks.test.ts` | `files/test__unit__hooks.test.md` |
+
+<Info>
+Flattening avoids creating nested directories and simplifies file discovery during session start.
+</Info>
+
+### Summary Format
+
+Each file summary is **3-5 lines max** with this structure:
+
+```markdown
+**Purpose:** One sentence — what this file does.
+**Key exports:** List the main functions/classes/constants exported.
+**Patterns:** Any notable patterns (e.g. "uses factory pattern", "singleton").
+**Last updated:** YYYY-MM-DD
+```
+
+### Example Summaries
+
+<CodeGroup>
+```markdown files/hooks__session-start.md
+**Purpose:** Loads global and project stash files and injects them into Claude's context at session start.
+**Key exports:** None (executable hook script).
+**Patterns:** Bash script that outputs JSON with `additional_context` field.
+**Last updated:** 2026-03-13
+```
+
+```markdown files/skills__auto-update__SKILL.md
+**Purpose:** Defines the AI workflow for updating file summaries after edits.
+**Key exports:** Skill instructions for creating/updating `.tokenstash/files/<path>.md`.
+**Patterns:** Template-based summary generation (Purpose/Exports/Patterns/Date).
+**Last updated:** 2026-03-13
+```
+
+```markdown files/commands__stash-scan.md
+**Purpose:** Slash command definition that invokes the tokenstash:scan skill.
+**Key exports:** Command metadata (description, disable-model-invocation flag).
+**Patterns:** Minimal wrapper that delegates to skill.
+**Last updated:** 2026-03-10
+```
+</CodeGroup>
+
+### When Summaries Are Written
+
+<Steps>
+  <Step title="Full Scan">
+    `/stash-scan` writes summaries for all files in the repo (excluding ignored paths)
+  </Step>
+  <Step title="Auto-Update">
+    After editing a file, the `post-tool-use` hook triggers `auto-update` skill
+  </Step>
+  <Step title="Manual Save">
+    `/stash-save` sweeps through edited files and writes missing summaries
+  </Step>
+</Steps>
+
+### What Gets Skipped
+
+The scan process excludes:
+- `.git/`, `node_modules/`, `.tokenstash/`, `dist/`, `build/`, `.next/`
+- Binary files (images, fonts, compiled artifacts)
+- Files over 500 lines (noted but skipped to keep summaries concise)
+
+## File Size Limits
+
+<Card title="Optimal File Summaries" icon="gauge">
+  Each file summary should be **3-5 lines max**. This keeps the total stash size small and fast to load.
+
+  **Example calculation:**
+  - 200 files × 5 lines = 1,000 lines
+  - At ~80 chars/line = ~80KB total
+  - Loads in &lt;100ms at session start
+</Card>
+
+<Warning>
+Don't write detailed documentation in file summaries. The goal is to help Claude **skip re-reading the file**, not understand it fully. Keep it concise.
+</Warning>
+
+## Safe to Commit?
+
+The stash contains **summaries**, not code. It's safe to commit, but most users add it to `.gitignore`:
+
+```bash .gitignore
+.tokenstash/
+```
+
+<Tip>
+If you work on the same project across machines, **commit the stash** to share context with teammates or your future self.
+</Tip>

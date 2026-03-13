@@ -1,0 +1,269 @@
+---
+title: /stash-save
+description: Save a full session summary to the TokenStash including decisions, architecture, and file summaries
+---
+
+## Overview
+
+The `/stash-save` command captures the context from your current coding session and writes it to the TokenStash. This ensures that future sessions start with knowledge of what was built, what decisions were made, and why.
+
+<Note>
+Run this command at the end of a coding session to preserve session context.
+</Note>
+
+## Syntax
+
+```bash
+/stash-save
+```
+
+<ParamField path="flags" type="none">
+  This command takes no flags or arguments.
+</ParamField>
+
+## What Gets Saved
+
+When you run `/stash-save`, TokenStash performs a comprehensive save across four areas:
+
+### 1. Decision Log
+
+Appends to `.tokenstash/decisions.md` with a timestamped session entry:
+
+```markdown
+## YYYY-MM-DD — <one-line session summary>
+
+**Decisions:**
+- [What was decided and why]
+- [Another decision if applicable]
+
+**Files changed:** file1.ts, file2.py
+```
+
+<Tip>
+Decisions are the most valuable part of the stash — they explain the "why" behind code changes.
+</Tip>
+
+### 2. Architecture Overview
+
+Updates `.tokenstash/architecture.md` if structural changes occurred:
+
+- New modules or components added
+- Changed architectural patterns
+- New dependencies introduced
+- Refactored code organization
+
+<Note>
+If nothing structural changed during the session, `architecture.md` is left unchanged.
+</Note>
+
+Format:
+
+```markdown
+## Architecture Overview
+[2-4 sentences describing the overall structure]
+
+## Key Components
+- `path/to/module`: what it does
+- `path/to/module`: what it does
+
+## Patterns
+- [notable patterns used]
+```
+
+### 3. File Summaries
+
+For every file you edited or read during the session, TokenStash writes or updates a summary in `.tokenstash/files/`.
+
+Each summary follows this format:
+
+```markdown
+**Purpose:** One sentence — what this file does.
+**Key exports:** Main functions/classes/constants exported.
+**Patterns:** Notable patterns (e.g. "uses factory pattern", "singleton").
+**Last updated:** YYYY-MM-DD
+```
+
+<Note>
+File summaries are kept to 3-5 lines max — just enough for future Claude to skip re-reading the file.
+</Note>
+
+### 4. Session Summary
+
+After saving, TokenStash confirms:
+
+```
+TokenStash saved. Session summary written to .tokenstash/decisions.md.
+```
+
+## Usage Examples
+
+### After Adding a Feature
+
+```bash
+# You just built a new authentication system
+/stash-save
+```
+
+**Result:**
+- Decision log entry explaining why you chose JWT over sessions
+- Architecture update showing new `auth/` module
+- File summaries for `auth/jwt.ts`, `auth/middleware.ts`, etc.
+
+### After a Refactoring Session
+
+```bash
+# You refactored the API layer
+/stash-save
+```
+
+**Result:**
+- Decision log documenting the refactoring rationale
+- Updated architecture showing new API structure
+- Refreshed summaries for all modified API files
+
+### After Bug Fixes
+
+```bash
+# Fixed several edge cases
+/stash-save
+```
+
+**Result:**
+- Decision log capturing what bugs were fixed and why they occurred
+- File summaries updated for the fixed files
+- Architecture unchanged (structural fix only)
+
+## When to Use
+
+<CardGroup cols={2}>
+  <Card title="End of Session" icon="door-open">
+    Always run before closing Claude Code to preserve session context
+  </Card>
+  
+  <Card title="After Major Changes" icon="code-branch">
+    Run after completing a feature, refactoring, or significant changes
+  </Card>
+  
+  <Card title="Before Context Switch" icon="arrows-rotate">
+    Run before switching to a different task or feature branch
+  </Card>
+  
+  <Card title="After Design Decisions" icon="lightbulb">
+    Run after making important architectural or implementation decisions
+  </Card>
+</CardGroup>
+
+## What Happens Behind the Scenes
+
+The command invokes the `tokenstash:save` skill, which:
+
+1. **Analyzes the current session** — reviews what files were read/edited
+2. **Extracts decisions** — identifies key decisions made during the session
+3. **Updates architecture** — checks if structural changes occurred
+4. **Sweeps file summaries** — ensures all touched files have current summaries
+5. **Writes to `.tokenstash/`** — persists everything to disk
+
+<Warning>
+The command creates `.tokenstash/` if it doesn't exist. Make sure you're in the correct repository before running.
+</Warning>
+
+## File Naming Convention
+
+File summaries use a flattened path structure:
+
+```
+src/lib/utils.ts → .tokenstash/files/src__lib__utils.md
+app/page.tsx → .tokenstash/files/app__page.md
+index.js → .tokenstash/files/index.md
+```
+
+Slashes (`/`) are replaced with double underscores (`__`).
+
+## Best Practices
+
+### Capture the "Why"
+
+Decisions should explain reasoning, not just actions:
+
+<CodeGroup>
+```markdown Good
+**Decisions:**
+- Chose PostgreSQL over MongoDB because we need ACID guarantees for financial transactions
+- Implemented connection pooling with max 20 connections to prevent database overload
+```
+
+```markdown Bad
+**Decisions:**
+- Added PostgreSQL
+- Added connection pooling
+```
+</CodeGroup>
+
+### Save Frequently
+
+Don't wait until the end of a long session:
+
+- Save after completing each feature
+- Save after important decisions
+- Save before switching contexts
+
+### Review Before Saving
+
+Quickly review what changed:
+
+```bash
+git status
+git diff
+```
+
+This helps TokenStash accurately capture your session.
+
+## Relationship to Auto-Update
+
+TokenStash automatically updates file summaries after every edit using the `auto-update` skill. The `/stash-save` command:
+
+- **Complements auto-update** — catches any files that were only read (not edited)
+- **Adds session context** — captures decisions and architecture that auto-update doesn't
+- **Ensures completeness** — sweeps through all session files to guarantee coverage
+
+<Tip>
+Even with auto-update running, always run `/stash-save` at the end of sessions to capture decisions.
+</Tip>
+
+## Troubleshooting
+
+### Command Does Nothing
+
+If `/stash-save` runs but nothing is written:
+
+- Check that you're in a git repository (`git rev-parse --show-toplevel`)
+- Verify you made changes during the session
+- Ensure `.tokenstash/` is writable
+
+### Summaries Are Missing
+
+If some files don't get summaries:
+
+- Files over 500 lines are skipped by design
+- Binary files are excluded
+- Files in excluded directories (`node_modules/`, `dist/`, etc.) are ignored
+
+### Architecture Wasn't Updated
+
+This is expected behavior if:
+
+- No structural changes occurred (only code changes within existing structure)
+- You only made bug fixes or minor updates
+- No new modules, patterns, or dependencies were added
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Scan Command" icon="magnifying-glass" href="/commands/stash-scan">
+    Index your entire repository at once
+  </Card>
+  
+  <Card title="Clear Command" icon="trash" href="/commands/stash-clear">
+    Reset the TokenStash
+  </Card>
+</CardGroup>

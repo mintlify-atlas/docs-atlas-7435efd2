@@ -1,0 +1,724 @@
+---
+title: Troubleshooting
+description: Common issues and solutions for TokenStash
+---
+
+Running into issues with TokenStash? This guide covers common problems and their solutions.
+
+## Installation Issues
+
+### Plugin Not Found
+
+**Symptom:** Error when running `/plugin install tokenstash@tokenstash`
+
+<Accordion title="Solution">
+  <Steps>
+    <Step title="Verify marketplace">
+      Ensure the marketplace is registered:
+      
+      ```bash
+      /plugin marketplace list
+      ```
+      
+      You should see `abhinavdubeyad9/tokenstash` in the list.
+    </Step>
+
+    <Step title="Re-register marketplace">
+      If not listed:
+      
+      ```bash
+      /plugin marketplace add abhinavdubeyad9/tokenstash
+      ```
+    </Step>
+
+    <Step title="Install again">
+      ```bash
+      /plugin install tokenstash@tokenstash
+      ```
+    </Step>
+  </Steps>
+</Accordion>
+
+### Plugin Installed but Commands Don't Work
+
+**Symptom:** `/stash-save` or `/stash-scan` not recognized
+
+<Accordion title="Solution">
+  <Steps>
+    <Step title="Verify installation">
+      ```bash
+      /plugin list
+      ```
+      
+      TokenStash should be in the installed plugins.
+    </Step>
+
+    <Step title="Restart Claude Code">
+      Close and reopen Claude Code. Plugins load at startup.
+    </Step>
+
+    <Step title="Check plugin version">
+      Ensure you have the latest version:
+      
+      ```bash
+      /plugin update tokenstash
+      ```
+    </Step>
+  </Steps>
+</Accordion>
+
+## Stash Not Being Injected
+
+### Claude Doesn't Know About My Project
+
+**Symptom:** After installation, Claude still asks to read files instead of using stash context
+
+<Accordion title="Solution 1: Stash doesn't exist yet">
+  If this is your first time using TokenStash:
+  
+  <Steps>
+    <Step title="Run initial scan">
+      ```bash
+      /stash-scan
+      ```
+    </Step>
+
+    <Step title="Verify stash created">
+      Check that `.tokenstash/` directory exists:
+      
+      ```bash
+      ls -la .tokenstash/
+      ```
+      
+      You should see `architecture.md` and `files/` directory.
+    </Step>
+
+    <Step title="Restart session">
+      Start a new Claude Code session. The stash is injected at session start.
+    </Step>
+  </Steps>
+</Accordion>
+
+<Accordion title="Solution 2: Not in a git repository">
+  TokenStash requires a git repository:
+  
+  <Steps>
+    <Step title="Initialize git">
+      ```bash
+      git init
+      ```
+    </Step>
+
+    <Step title="Run scan">
+      ```bash
+      /stash-scan
+      ```
+    </Step>
+  </Steps>
+  
+  <Note>
+  TokenStash uses `git rev-parse --show-toplevel` to find the repo root. Without a git repo, it can't determine where to save the stash.
+  </Note>
+</Accordion>
+
+<Accordion title="Solution 3: Stash in wrong location">
+  Verify stash location:
+  
+  ```bash
+  # Find repo root
+  git rev-parse --show-toplevel
+  
+  # Check for stash
+  ls -la $(git rev-parse --show-toplevel)/.tokenstash/
+  ```
+  
+  If `.tokenstash/` is in a different directory, move it to the repo root.
+</Accordion>
+
+## Scanning Issues
+
+### `/stash-scan` Takes Too Long
+
+**Symptom:** Scan runs for minutes without completing
+
+<Accordion title="Solution">
+  Large codebases take time. Optimize the scan:
+  
+  <Steps>
+    <Step title="Exclude directories">
+      Ensure `.gitignore` includes large directories:
+      
+      ```
+      node_modules/
+      dist/
+      build/
+      .next/
+      coverage/
+      ```
+      
+      TokenStash respects `.gitignore`.
+    </Step>
+
+    <Step title="Clean build artifacts">
+      ```bash
+      git clean -fdx
+      ```
+      
+      Then re-run scan.
+    </Step>
+
+    <Step title="Monitor progress">
+      Claude should show progress. If it's stuck, interrupt and restart:
+      
+      ```bash
+      # Interrupt (Ctrl+C)
+      /stash-scan
+      ```
+    </Step>
+  </Steps>
+</Accordion>
+
+### Files Skipped During Scan
+
+**Symptom:** Some files aren't getting summarized
+
+<Accordion title="Reason 1: Files over 500 lines">
+  TokenStash skips files over 500 lines by design.
+  
+  **Solutions:**
+  - Refactor large files into smaller modules
+  - Manually write summaries for critical large files
+  
+  ```bash
+  # Example: Manual summary for large file
+  echo "**Purpose:** Main application entry point
+**Key exports:** App component, store, router
+**Patterns:** Bootstraps React app with providers
+**Last updated:** 2026-03-13" > .tokenstash/files/src__App.tsx.md
+  ```
+</Accordion>
+
+<Accordion title="Reason 2: Binary files">
+  TokenStash skips binary files (images, fonts, etc.). This is expected.
+</Accordion>
+
+<Accordion title="Reason 3: Already summarized">
+  Without `--force`, scan skips files with existing summaries.
+  
+  **Solution:**
+  ```bash
+  /stash-scan --force
+  ```
+  
+  This overwrites all summaries.
+</Accordion>
+
+### Scan Fails with Error
+
+**Symptom:** `/stash-scan` exits with an error message
+
+<Accordion title="Solution">
+  <Steps>
+    <Step title="Check git repository">
+      Ensure you're in a git repo:
+      
+      ```bash
+      git status
+      ```
+      
+      If not a repo, run `git init`.
+    </Step>
+
+    <Step title="Check permissions">
+      Verify write permissions:
+      
+      ```bash
+      touch .tokenstash/test.txt && rm .tokenstash/test.txt
+      ```
+      
+      If this fails, check file permissions.
+    </Step>
+
+    <Step title="Try clean scan">
+      Remove existing stash and re-scan:
+      
+      ```bash
+      /stash-clear
+      /stash-scan
+      ```
+    </Step>
+  </Steps>
+</Accordion>
+
+## Auto-Update Issues
+
+### File Summaries Not Updating Automatically
+
+**Symptom:** Edit files but summaries in `.tokenstash/files/` don't update
+
+<Accordion title="Solution">
+  <Steps>
+    <Step title="Verify hooks are enabled">
+      Check that TokenStash hooks are registered:
+      
+      ```bash
+      cat .claude-plugin/tokenstash/hooks/hooks.json
+      ```
+      
+      Should include `PostToolUse` hook for `Write|Edit`.
+    </Step>
+
+    <Step title="Check for hook errors">
+      Look for error messages after file edits. If hooks fail silently, check Claude Code logs.
+    </Step>
+
+    <Step title="Manual update">
+      As a workaround, run:
+      
+      ```bash
+      /stash-save
+      ```
+      
+      This sweeps and updates all edited files.
+    </Step>
+  </Steps>
+</Accordion>
+
+### Auto-Update Creates Wrong Summaries
+
+**Symptom:** File summaries are too generic or incorrect
+
+<Accordion title="Solution">
+  Auto-generated summaries can be improved:
+  
+  <Steps>
+    <Step title="Edit summary manually">
+      Find the file:
+      
+      ```bash
+      # For src/api/users.ts:
+      .tokenstash/files/src__api__users.md
+      ```
+      
+      Edit to be more specific.
+    </Step>
+
+    <Step title="Force re-scan">
+      If many summaries are poor:
+      
+      ```bash
+      /stash-scan --force
+      ```
+      
+      This regenerates all summaries.
+    </Step>
+  </Steps>
+</Accordion>
+
+## Command Issues
+
+### `/stash-save` Doesn't Update decisions.md
+
+**Symptom:** Run `/stash-save` but `decisions.md` unchanged or missing entries
+
+<Accordion title="Solution">
+  <Steps>
+    <Step title="Check file exists">
+      ```bash
+      ls -la .tokenstash/decisions.md
+      ```
+      
+      If missing, `/stash-save` should create it.
+    </Step>
+
+    <Step title="Verify write permissions">
+      ```bash
+      touch .tokenstash/decisions.md
+      ```
+      
+      If this fails, fix permissions.
+    </Step>
+
+    <Step title="Run save again">
+      ```bash
+      /stash-save
+      ```
+      
+      Check if entry appears.
+    </Step>
+  </Steps>
+</Accordion>
+
+### `/stash-clear` Asks for Confirmation but Doesn't Wait
+
+**Symptom:** `/stash-clear` immediately proceeds without waiting for "YES"
+
+<Accordion title="Solution">
+  This is expected behavior — Claude should ask for confirmation:
+  
+  ```
+  Are you sure you want to wipe .tokenstash/ for this project? Type YES to confirm.
+  ```
+  
+  <Steps>
+    <Step title="Respond with YES">
+      Type exactly `YES` (all caps) to confirm.
+    </Step>
+
+    <Step title="Any other response cancels">
+      Anything other than `YES` will cancel the operation.
+    </Step>
+  </Steps>
+</Accordion>
+
+## Context Issues
+
+### Claude Gives Outdated Information
+
+**Symptom:** Claude references old code or architecture that no longer exists
+
+<Accordion title="Solution">
+  Stash is stale. Refresh it:
+  
+  <Steps>
+    <Step title="Save current state">
+      ```bash
+      /stash-save
+      ```
+    </Step>
+
+    <Step title="Force re-scan">
+      ```bash
+      /stash-scan --force
+      ```
+      
+      This rebuilds all summaries from current code.
+    </Step>
+
+    <Step title="Restart session">
+      Close and reopen Claude Code to inject fresh stash.
+    </Step>
+  </Steps>
+</Accordion>
+
+### Stash Too Large, Slows Down Claude
+
+**Symptom:** Claude Code is slow to start or respond
+
+<Accordion title="Solution">
+  Reduce stash size:
+  
+  <Steps>
+    <Step title="Check stash size">
+      ```bash
+      du -sh .tokenstash/
+      ```
+    </Step>
+
+    <Step title="Remove test file summaries">
+      ```bash
+      find .tokenstash/files -name '*__test.md' -delete
+      find .tokenstash/files -name '*__spec.md' -delete
+      ```
+    </Step>
+
+    <Step title="Trim decisions.md">
+      If `decisions.md` is huge, archive old entries:
+      
+      ```bash
+      # Keep last 50 entries, archive the rest
+      tail -n 1000 .tokenstash/decisions.md > .tokenstash/decisions.md.tmp
+      mv .tokenstash/decisions.md .tokenstash/decisions.archive.md
+      mv .tokenstash/decisions.md.tmp .tokenstash/decisions.md
+      ```
+    </Step>
+  </Steps>
+</Accordion>
+
+## Git/Team Issues
+
+### Merge Conflicts in .tokenstash/
+
+**Symptom:** Pull changes and get merge conflicts in stash files
+
+<Accordion title="Solution">
+  <Steps>
+    <Step title="Resolve like documentation">
+      Stash files are documentation. Merge manually or pick one version:
+      
+      ```bash
+      # Option 1: Accept theirs
+      git checkout --theirs .tokenstash/
+      
+      # Option 2: Accept ours
+      git checkout --ours .tokenstash/
+      ```
+    </Step>
+
+    <Step title="Or rebuild from scratch">
+      If conflicts are messy:
+      
+      ```bash
+      /stash-clear
+      /stash-scan
+      ```
+    </Step>
+
+    <Step title="Complete merge">
+      ```bash
+      git add .tokenstash/
+      git commit
+      ```
+    </Step>
+  </Steps>
+</Accordion>
+
+### Stash Out of Sync with Team
+
+**Symptom:** Your stash differs from teammates' after syncing
+
+<Accordion title="Solution">
+  <Steps>
+    <Step title="Pull latest changes">
+      ```bash
+      git pull
+      ```
+      
+      This brings in teammates' stash updates.
+    </Step>
+
+    <Step title="Verify stash">
+      ```bash
+      cat .tokenstash/architecture.md
+      ```
+      
+      Check if it reflects current codebase.
+    </Step>
+
+    <Step title="Re-scan if needed">
+      If stash is out of sync:
+      
+      ```bash
+      /stash-scan --force
+      ```
+    </Step>
+  </Steps>
+</Accordion>
+
+## Performance Issues
+
+### Claude Code Startup is Slow
+
+**Symptom:** Claude Code takes a long time to start
+
+<Accordion title="Solution">
+  <Steps>
+    <Step title="Check stash size">
+      ```bash
+      du -sh .tokenstash/
+      du -sh ~/.claude/tokenstash/
+      ```
+      
+      If over 10MB, consider trimming.
+    </Step>
+
+    <Step title="Reduce file summaries">
+      Remove summaries for non-essential files:
+      
+      ```bash
+      # Remove test files
+      find .tokenstash/files -name '*test*.md' -delete
+      
+      # Remove generated files
+      find .tokenstash/files -name '*generated*.md' -delete
+      ```
+    </Step>
+
+    <Step title="Archive old decisions">
+      Keep only recent decisions in `decisions.md`.
+    </Step>
+  </Steps>
+</Accordion>
+
+## Edge Cases
+
+### Monorepo Support
+
+**Symptom:** Using TokenStash in a monorepo with multiple packages
+
+<Accordion title="Solution">
+  TokenStash creates one stash per git repository:
+  
+  - Stash is at repo root: `<monorepo-root>/.tokenstash/`
+  - Includes all packages
+  
+  If you want separate stashes per package:
+  
+  1. Initialize each package as its own git repo (submodules)
+  2. Run `/stash-scan` in each package
+  
+  <Note>
+  Most monorepos work best with a single stash at the root.
+  </Note>
+</Accordion>
+
+### Non-Git Projects
+
+**Symptom:** Want to use TokenStash in a non-git project
+
+<Accordion title="Solution">
+  TokenStash requires git. Workaround:
+  
+  <Steps>
+    <Step title="Initialize git">
+      ```bash
+      git init
+      ```
+    </Step>
+
+    <Step title="Add to .gitignore">
+      If you don't plan to use git:
+      
+      ```bash
+      echo "*" > .gitignore
+      echo "!.tokenstash/" >> .gitignore
+      ```
+      
+      This ignores everything except the stash.
+    </Step>
+
+    <Step title="Run scan">
+      ```bash
+      /stash-scan
+      ```
+    </Step>
+  </Steps>
+</Accordion>
+
+### Switching Git Branches
+
+**Symptom:** Stash is wrong after switching branches
+
+<Accordion title="Solution">
+  <Steps>
+    <Step title="Commit or stash changes">
+      If `.tokenstash/` is tracked by git, it switches with your branch.
+    </Step>
+
+    <Step title="Re-scan after switch">
+      If branches differ significantly:
+      
+      ```bash
+      git checkout other-branch
+      /stash-scan --force
+      ```
+    </Step>
+
+    <Step title="Keep stash local (optional)">
+      Add to `.gitignore` to have separate stashes per branch:
+      
+      ```bash
+      echo ".tokenstash/" >> .gitignore
+      ```
+    </Step>
+  </Steps>
+</Accordion>
+
+## Getting Help
+
+If you're still stuck:
+
+<CardGroup cols={2}>
+  <Card title="Check the README" icon="book">
+    Review the source repository for latest info:
+    
+    ```bash
+    cat .claude-plugin/tokenstash/README.md
+    ```
+  </Card>
+  
+  <Card title="Review command docs" icon="terminal" href="/commands/overview">
+    Check detailed command documentation
+  </Card>
+  
+  <Card title="Inspect hooks" icon="link">
+    Verify hooks are configured:
+    
+    ```bash
+    cat .claude-plugin/tokenstash/hooks/hooks.json
+    ```
+  </Card>
+  
+  <Card title="Check logs" icon="file-lines">
+    Look for errors in Claude Code logs
+  </Card>
+</CardGroup>
+
+## Debug Checklist
+
+When troubleshooting:
+
+- [ ] Verify plugin is installed: `/plugin list`
+- [ ] Check you're in a git repository: `git status`
+- [ ] Confirm stash exists: `ls -la .tokenstash/`
+- [ ] Verify stash location: `git rev-parse --show-toplevel`
+- [ ] Check file permissions: `touch .tokenstash/test.txt`
+- [ ] Review hooks: `cat .claude-plugin/tokenstash/hooks/hooks.json`
+- [ ] Try clean scan: `/stash-clear` then `/stash-scan`
+- [ ] Restart Claude Code session
+
+## Nuclear Option: Complete Reset
+
+If nothing works, start fresh:
+
+<Warning>
+This deletes all stash data. Only use as a last resort.
+</Warning>
+
+<Steps>
+  <Step title="Clear project stash">
+    ```bash
+    /stash-clear
+    ```
+    
+    Confirm with `YES`.
+  </Step>
+
+  <Step title="Remove global stash (optional)">
+    ```bash
+    rm -rf ~/.claude/tokenstash/
+    ```
+  </Step>
+
+  <Step title="Reinstall plugin">
+    ```bash
+    /plugin uninstall tokenstash
+    /plugin install tokenstash@tokenstash
+    ```
+  </Step>
+
+  <Step title="Restart Claude Code">
+    Close and reopen.
+  </Step>
+
+  <Step title="Initial scan">
+    ```bash
+    /stash-scan
+    ```
+  </Step>
+</Steps>
+
+## Still Having Issues?
+
+If these solutions don't help:
+
+1. **Check for updates:** Ensure you have the latest version of TokenStash
+2. **Report the issue:** Contact the plugin author with:
+   - Exact error message
+   - Steps to reproduce
+   - Output of `/plugin list`
+   - Claude Code version
+
+<Tip>
+Most issues are resolved by running `/stash-scan --force` and restarting Claude Code.
+</Tip>

@@ -1,0 +1,414 @@
+---
+title: /stash-scan
+description: Scan the entire repository and build the complete TokenStash index with file summaries and architecture
+---
+
+## Overview
+
+The `/stash-scan` command performs a comprehensive scan of your repository, generating summaries for all relevant files and creating a complete architectural overview. This is typically run once when setting up TokenStash for a new project.
+
+<Note>
+Use this command to bootstrap TokenStash on an existing codebase or to refresh the entire index.
+</Note>
+
+## Syntax
+
+```bash
+/stash-scan
+```
+
+```bash
+/stash-scan --force
+```
+
+<ParamField path="--force" type="flag">
+  Re-scan all files and overwrite existing summaries. Without this flag, files that already have summaries are skipped.
+</ParamField>
+
+## Scan Behavior
+
+### Default Mode (Incremental)
+
+Without `--force`, the scan is incremental:
+
+- Skips files that already have summaries in `.tokenstash/files/`
+- Only processes new or unsummarized files
+- Faster for repositories with partial stash coverage
+
+```bash
+/stash-scan
+```
+
+<Tip>
+Use default mode for quick updates when you've added new files to the project.
+</Tip>
+
+### Force Mode (Complete Rebuild)
+
+With `--force`, the scan is comprehensive:
+
+- Overwrites all existing summaries
+- Re-processes every file in the repository
+- Regenerates the complete architecture overview
+
+```bash
+/stash-scan --force
+```
+
+<Warning>
+Force mode can take several minutes on large repositories. Use it when you need a fresh rebuild.
+</Warning>
+
+## Scan Process
+
+The scan follows a systematic workflow:
+
+### 1. Find Repository Root
+
+TokenStash locates the git repository root:
+
+```bash
+git rev-parse --show-toplevel
+```
+
+All stash files are written to `<repo-root>/.tokenstash/`.
+
+### 2. Discover Files
+
+TokenStash lists all files in the repository, applying exclusions:
+
+**Excluded Directories:**
+- `.git/` — git internals
+- `node_modules/` — dependencies
+- `.tokenstash/` — the stash itself
+- `dist/`, `build/`, `.next/` — build artifacts
+
+**Excluded Files:**
+- Binary files (images, fonts, compiled artifacts)
+- Files over 500 lines (skipped with a note)
+
+<Note>
+Files over 500 lines are intentionally skipped to keep summaries focused on entry points and high-level modules.
+</Note>
+
+### 3. Summarize Each File
+
+For each discovered file (or all files with `--force`):
+
+1. **Read the file** — load the source code
+2. **Generate summary** — analyze purpose, exports, and patterns
+3. **Write to `.tokenstash/files/`** — save as `<flattened-path>.md`
+
+Summary format:
+
+```markdown
+**Purpose:** One sentence.
+**Key exports:** Main functions/classes/constants.
+**Patterns:** Notable patterns.
+**Last updated:** YYYY-MM-DD
+```
+
+### 4. Write Architecture Overview
+
+After scanning all files, TokenStash generates `.tokenstash/architecture.md`:
+
+```markdown
+## Architecture Overview
+[2-4 sentences]
+
+## Key Components
+- `path/`: description
+...
+
+## Patterns
+- [patterns observed]
+
+## Tech Stack
+- [main technologies]
+```
+
+This provides a high-level map of the entire codebase.
+
+### 5. Report Results
+
+TokenStash reports:
+
+- Number of files summarized
+- Location of the stash
+- Any files that were skipped
+
+```
+Scanned 147 files. Summaries written to .tokenstash/
+Skipped 12 files over 500 lines.
+```
+
+## Usage Examples
+
+### Bootstrap a New Project
+
+```bash
+# First time using TokenStash on this repository
+/stash-scan
+```
+
+**Result:**
+- Complete file summaries for all source files
+- Architecture overview generated
+- TokenStash ready for future sessions
+
+### Refresh After Major Changes
+
+```bash
+# Project structure changed significantly
+/stash-scan --force
+```
+
+**Result:**
+- All summaries regenerated from scratch
+- Architecture overview reflects new structure
+- Previous summaries overwritten
+
+### Add Summaries for New Files
+
+```bash
+# Added several new modules
+/stash-scan
+```
+
+**Result:**
+- Only new files are summarized
+- Existing summaries preserved
+- Fast incremental update
+
+### Verify Scan Coverage
+
+```bash
+# Check what's been summarized
+ls .tokenstash/files/ | wc -l
+```
+
+## When to Use
+
+<CardGroup cols={2}>
+  <Card title="New Project Setup" icon="folder-plus">
+    Run once when first installing TokenStash on an existing codebase
+  </Card>
+  
+  <Card title="After Major Refactoring" icon="code-branch">
+    Use `--force` to rebuild after significant structural changes
+  </Card>
+  
+  <Card title="Adding New Modules" icon="plus">
+    Run without `--force` to quickly summarize new files
+  </Card>
+  
+  <Card title="Stale Summaries" icon="clock-rotate-left">
+    Use `--force` when summaries feel outdated or incorrect
+  </Card>
+</CardGroup>
+
+## File Naming Convention
+
+File summaries use a flattened path where `/` becomes `__`:
+
+```
+src/components/Button.tsx → src__components__Button.md
+lib/utils/helpers.js → lib__utils__helpers.md
+api/v1/users.py → api__v1__users.md
+```
+
+This avoids nested directory structures in `.tokenstash/files/`.
+
+## Performance Considerations
+
+### Scan Time
+
+Scan duration depends on:
+
+- **Repository size** — more files = longer scan
+- **File complexity** — larger files take longer to summarize
+- **Force flag** — `--force` rescans everything
+
+**Typical times:**
+- Small project (50 files): 10-30 seconds
+- Medium project (200 files): 1-2 minutes
+- Large project (500+ files): 3-5 minutes
+
+<Tip>
+Use incremental scans (without `--force`) for faster updates.
+</Tip>
+
+### Token Usage
+
+Scanning uses tokens to generate summaries. TokenStash optimizes by:
+
+- Skipping files over 500 lines
+- Excluding binary and build artifacts
+- Keeping summaries to 3-5 lines max
+
+## What Files Get Skipped
+
+### By Design (Always)
+
+- **Binary files:** images, fonts, compiled code
+- **Dependencies:** `node_modules/`, `vendor/`, `packages/`
+- **Build artifacts:** `dist/`, `build/`, `.next/`, `out/`
+- **Git internals:** `.git/`
+- **TokenStash itself:** `.tokenstash/`
+
+### By Size Threshold
+
+- **Files over 500 lines:** Intentionally skipped to focus on high-level modules and entry points
+
+<Note>
+If a critical file is over 500 lines, consider refactoring it or manually adding a summary to `.tokenstash/files/`.
+</Note>
+
+## Incremental vs Force Scan
+
+### When to Use Incremental (default)
+
+```bash
+/stash-scan
+```
+
+- **Adding new features** — summarize only new files
+- **Quick updates** — fast scan of recent changes
+- **Preserving manual edits** — keep hand-written summaries
+
+### When to Use Force
+
+```bash
+/stash-scan --force
+```
+
+- **Complete rebuild** — start fresh with all summaries
+- **After major refactoring** — reflect structural changes
+- **Stale summaries** — regenerate outdated summaries
+- **Testing** — verify scan behavior
+
+## Scan Output Structure
+
+After scanning, `.tokenstash/` contains:
+
+```
+.tokenstash/
+├── architecture.md           # Generated architecture overview
+└── files/                   # Per-file summaries
+    ├── src__index.md
+    ├── src__app__main.md
+    ├── src__lib__utils.md
+    ├── src__components__Button.md
+    └── ...
+```
+
+<Note>
+`decisions.md` and `rules.md` are not generated by scan — they're created manually or via `/stash-save`.
+</Note>
+
+## Troubleshooting
+
+### Scan Hangs or Times Out
+
+**Cause:** Very large repository or slow file I/O
+
+**Solution:**
+- Use incremental scan (without `--force`)
+- Exclude large directories via `.gitignore`
+- Check for files that shouldn't be in the repo
+
+### Missing Summaries
+
+**Cause:** Files were skipped due to size or type
+
+**Solution:**
+- Check if files are over 500 lines (`wc -l <file>`)
+- Verify files aren't in excluded directories
+- Manually create summaries in `.tokenstash/files/` if needed
+
+### Summaries Are Too Generic
+
+**Cause:** Files lack clear purpose or exports
+
+**Solution:**
+- Add JSDoc/docstrings to improve context
+- Manually edit summaries in `.tokenstash/files/`
+- Refactor code to have clearer module boundaries
+
+### Architecture Overview Is Shallow
+
+**Cause:** Codebase structure is unclear or too flat
+
+**Solution:**
+- Manually edit `.tokenstash/architecture.md`
+- Add comments to key modules explaining their role
+- Use `/stash-save` after making architectural changes
+
+## Best Practices
+
+### Scan Once, Save Often
+
+- Run `/stash-scan` once during initial setup
+- Use `/stash-save` at the end of each session
+- Auto-update handles file changes during sessions
+
+### Use Force Sparingly
+
+`--force` is powerful but slow:
+
+- Only use when summaries are definitely stale
+- Prefer incremental scans for routine updates
+- Consider manual edits for individual files
+
+### Combine with Manual Curation
+
+Scan provides a baseline:
+
+- Edit `.tokenstash/architecture.md` to add insights
+- Refine file summaries for critical modules
+- Add project context that scan can't infer
+
+### Keep Exclusions Updated
+
+If scan includes unwanted files:
+
+- Add them to `.gitignore`
+- Scan respects gitignore patterns
+- Keep build artifacts and dependencies excluded
+
+## Relationship to Other Commands
+
+### vs. /stash-save
+
+| Feature | /stash-scan | /stash-save |
+|---------|-------------|-------------|
+| **Scope** | Entire repository | Current session only |
+| **Speed** | Slow (minutes) | Fast (seconds) |
+| **Decisions** | No | Yes |
+| **Architecture** | Always generates | Only if changed |
+| **When to use** | Initial setup | End of session |
+
+### vs. Auto-Update
+
+| Feature | /stash-scan | Auto-Update |
+|---------|-------------|-------------|
+| **Trigger** | Manual command | Automatic on edit |
+| **Coverage** | All files | Only edited files |
+| **Architecture** | Yes | No |
+| **Force rebuild** | Yes (with --force) | No |
+
+<Tip>
+Combine all three: scan once on setup, let auto-update handle edits, and use save for session context.
+</Tip>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Save Command" icon="floppy-disk" href="/commands/stash-save">
+    Learn how to save session summaries
+  </Card>
+  
+  <Card title="Clear Command" icon="trash" href="/commands/stash-clear">
+    Reset the TokenStash
+  </Card>
+</CardGroup>

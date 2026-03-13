@@ -1,0 +1,87 @@
+---
+title: Introduction
+description: Cache project context locally so Claude starts every session knowing your codebase
+---
+
+# Welcome to TokenStash
+
+TokenStash is a Claude Code plugin that caches project context locally — so Claude starts every session already knowing your codebase. No re-reading files. No re-explaining architecture. Just start coding.
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get TokenStash running in 2 minutes
+  </Card>
+  <Card title="How It Works" icon="gear" href="/concepts/how-it-works">
+    Understand the stash system
+  </Card>
+  <Card title="Commands" icon="terminal" href="/commands/overview">
+    Learn the slash commands
+  </Card>
+  <Card title="Best Practices" icon="star" href="/guides/best-practices">
+    Get the most from your stash
+  </Card>
+</CardGroup>
+
+## What Gets Stashed
+
+TokenStash saves summaries of your project as you work, stored in `.tokenstash/`:
+
+<CardGroup cols={2}>
+  <Card title="architecture.md" icon="sitemap">
+    High-level codebase overview — structure, patterns, key components
+  </Card>
+  <Card title="decisions.md" icon="clipboard-list">
+    Decision log — what was decided each session and why
+  </Card>
+  <Card title="rules.md" icon="book">
+    Project-specific rules (CLAUDE.md on steroids)
+  </Card>
+  <Card title="files/" icon="folder">
+    Per-file summaries (3-5 lines each)
+  </Card>
+</CardGroup>
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Automatic Context" icon="brain">
+    Stash is injected at every session start — Claude already knows your project
+  </Card>
+  <Card title="Session Logging" icon="clock">
+    Track decisions and changes across sessions
+  </Card>
+  <Card title="Full Repo Scanning" icon="magnifying-glass">
+    Index your entire codebase with `/stash-scan`
+  </Card>
+  <Card title="Auto File Tracking" icon="file-code">
+    File summaries update automatically after edits
+  </Card>
+  <Card title="Two-Level Stash" icon="layer-group">
+    Global stash for preferences, project stash for code
+  </Card>
+  <Card title="Zero Config" icon="check">
+    Works out of the box — no setup required
+  </Card>
+</CardGroup>
+
+## How It Builds Up
+
+TokenStash grows organically as you work:
+
+- **Auto:** After every file edit, Claude updates that file's summary silently
+- **Manual:** Run `/stash-save` at the end of a session to save decisions and architecture
+- **Full index:** Run `/stash-scan` once on a new project to summarize everything upfront
+
+## Next Steps
+
+<Steps>
+  <Step title="Install TokenStash">
+    Follow the [installation guide](/installation) to add the plugin to Claude Code
+  </Step>
+  <Step title="Try the quickstart">
+    Run through the [quickstart](/quickstart) to see TokenStash in action
+  </Step>
+  <Step title="Learn the workflow">
+    Read the [daily workflow guide](/guides/daily-workflow) to integrate TokenStash into your routine
+  </Step>
+</Steps>

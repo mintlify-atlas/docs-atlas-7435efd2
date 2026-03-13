@@ -1,80 +1,276 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick Start
+description: Get started with TokenStash and cache your first project context
 ---
 
-## Get started in three steps
+This guide walks you through using TokenStash for the first time — from installation to saving your first stash.
 
-Get your documentation site running locally and make your first customization.
+## Complete Workflow
 
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+<Steps>
+  <Step title="Install TokenStash">
+    If you haven't already installed TokenStash, add the marketplace and install the plugin:
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    ```bash
+    /plugin marketplace add abhinavdubeyad9/tokenstash
+    /plugin install tokenstash@tokenstash
+    ```
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+    Start a new Claude Code session to activate the plugin.
+  </Step>
 
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+  <Step title="Build your initial stash">
+    Run a full repository scan to create the initial TokenStash index:
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    ```bash
+    /stash-scan
+    ```
+    
+    This command will:
+    - Discover all files in your repository
+    - Create summaries for each file (excluding binaries, node_modules, etc.)
+    - Generate an architecture overview
+    - Save everything to `.tokenstash/` in your repo root
+    
+    <Note>
+      The scan excludes common directories like `.git/`, `node_modules/`, `dist/`, `build/`, and `.next/`. Files over 500 lines are skipped with a note.
+    </Note>
+  </Step>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+  <Step title="Make some changes">
+    Work on your project normally. Edit files, add features, fix bugs — TokenStash tracks everything automatically.
+    
+    Every time you edit a file, TokenStash will:
+    - Automatically update that file's summary in `.tokenstash/files/`
+    - Keep the summary under 5 lines (purpose, exports, patterns)
+    - Do this silently in the background
+  </Step>
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+  <Step title="Save your session">
+    At the end of your work session, save a summary of what you accomplished:
+    
+    ```bash
+    /stash-save
+    ```
+    
+    This command saves:
+    - **Decisions**: What you decided and why (appended to `decisions.md`)
+    - **Architecture**: Updates if the structure changed
+    - **File summaries**: Any files you edited that weren't auto-updated
+    
+    Example decision entry:
+    ```markdown
+    ## 2026-03-13 — Added user authentication
+    
+    **Decisions:**
+    - Switched from JWT to session-based auth for better security
+    - Stored sessions in Redis instead of memory
+    
+    **Files changed:** auth.ts, session.ts, middleware.ts
+    ```
+  </Step>
 
-### Step 3: Go live
+  <Step title="Start a new session">
+    Close Claude Code and start a new session. TokenStash will automatically inject the cached context:
+    
+    - Architecture overview
+    - Decision history
+    - Project rules
+    - File summaries
+    
+    Claude now starts the session **already knowing your codebase** — no need to re-read files or re-explain architecture.
+  </Step>
+</Steps>
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+## What Gets Cached
 
-## Next steps
-
-Now that you have your docs running, explore these key features:
+TokenStash maintains four types of files in `.tokenstash/`:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="architecture.md" icon="sitemap">
+    High-level codebase overview — structure, patterns, key components, and tech stack
+  </Card>
+  
+  <Card title="decisions.md" icon="list-check">
+    Decision log — what was decided each session and why, with timestamps and affected files
+  </Card>
+  
+  <Card title="rules.md" icon="book">
+    Project-specific rules and conventions (like CLAUDE.md on steroids)
+  </Card>
+  
+  <Card title="files/*.md" icon="folder">
+    Per-file summaries (3-5 lines each) — purpose, exports, patterns, and last updated date
+  </Card>
 </CardGroup>
 
+## Command Reference
+
+<CodeGroup>
+```bash Save session summary
+/stash-save
+```
+
+```bash Full repo scan
+/stash-scan
+```
+
+```bash Force re-scan
+/stash-scan --force
+```
+
+```bash Clear project stash
+/stash-clear
+```
+</CodeGroup>
+
+### Command Details
+
+| Command | What It Does | When to Use |
+|---------|--------------|-------------|
+| `/stash-save` | Save session summary — decisions, architecture, file summaries | End of every work session |
+| `/stash-scan` | Index the whole repo on demand | First time in a new project, or after major changes |
+| `/stash-scan --force` | Re-scan everything, overwrite existing summaries | When summaries are outdated or incorrect |
+| `/stash-clear` | Wipe the project stash (asks for confirmation) | When you want to start fresh |
+
+## How the Stash Builds Up
+
+TokenStash uses a three-tier approach to build context:
+
+<Steps>
+  <Step title="Automatic updates">
+    After every file edit, Claude automatically updates that file's summary silently.
+    
+    **What gets updated:**
+    - Purpose (one sentence)
+    - Key exports (functions, classes, constants)
+    - Patterns (notable patterns like factory, singleton)
+    - Last updated date
+    
+    **File path format:** `src/lib/utils.ts` → `.tokenstash/files/src__lib__utils.md`
+  </Step>
+
+  <Step title="Manual session saves">
+    Run `/stash-save` at the end of a session to save:
+    - Decisions made and why
+    - Architecture changes (if structure changed)
+    - Any missing file summaries
+  </Step>
+
+  <Step title="Full repository scans">
+    Run `/stash-scan` once on a new project to:
+    - Summarize all files upfront
+    - Generate the initial architecture overview
+    - Create the complete stash index
+  </Step>
+</Steps>
+
+## Example: File Summary Format
+
+Here's what a file summary looks like in `.tokenstash/files/`:
+
+```markdown src__lib__auth.md
+**Purpose:** Handles user authentication and session management.
+**Key exports:** `authenticateUser()`, `createSession()`, `validateToken()`
+**Patterns:** Uses middleware pattern for request validation.
+**Last updated:** 2026-03-13
+```
+
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  Summaries are kept under 5 lines. The goal is to let Claude skip re-reading the file, not to understand it fully.
 </Note>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Save often" icon="floppy-disk">
+    Run `/stash-save` at the end of every work session to capture decisions while they're fresh
+  </Card>
+  
+  <Card title="Scan new projects" icon="magnifying-glass">
+    Run `/stash-scan` immediately on new projects to build the initial context
+  </Card>
+  
+  <Card title="Let auto-update work" icon="rotate">
+    Don't manually update file summaries — let TokenStash handle it automatically
+  </Card>
+  
+  <Card title="Commit the stash" icon="code-commit">
+    Consider committing `.tokenstash/` to share context with your team
+  </Card>
+</CardGroup>
+
+## Global vs. Project Stash
+
+TokenStash supports two levels of context:
+
+### Global Stash (`~/.claude/tokenstash/`)
+
+Use for preferences and rules that apply across **all** projects:
+
+```markdown ~/.claude/tokenstash/preferences.md
+## Code Style
+- Always use TypeScript strict mode
+- Prefer functional programming patterns
+- Use 2-space indentation
+
+## Testing
+- Write unit tests for all business logic
+- Use Jest for testing
+```
+
+### Project Stash (`<repo-root>/.tokenstash/`)
+
+Use for project-specific context (takes priority over global):
+
+```markdown .tokenstash/rules.md
+## API Conventions
+- All endpoints use REST
+- Authentication via JWT tokens
+- Errors return { error: string, code: number }
+
+## Database
+- Use Prisma for all DB queries
+- Never use raw SQL
+```
+
+<Warning>
+  Project stash takes priority over global stash. If the same file exists in both locations, only the project version is loaded.
+</Warning>
+
+## Troubleshooting
+
+### Stash not loading
+
+1. Verify you're in a Git repository: `git status`
+2. Check if `.tokenstash/` exists in your repo root
+3. Start a new session to reload the stash
+
+### Summaries are outdated
+
+Run a force re-scan to regenerate all summaries:
+
+```bash
+/stash-scan --force
+```
+
+### Want to start fresh
+
+Clear the project stash and rebuild:
+
+```bash
+/stash-clear
+/stash-scan
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Commands" icon="terminal" href="/commands">
+    Explore all TokenStash commands and options
+  </Card>
+  
+  <Card title="Architecture" icon="sitemap" href="/concepts/stash-structure">
+    Learn how TokenStash works under the hood
+  </Card>
+</CardGroup>

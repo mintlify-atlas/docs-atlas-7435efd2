@@ -1,0 +1,419 @@
+---
+title: Hook System
+description: Technical reference for TokenStash's hook implementation
+---
+
+TokenStash uses Claude Code's hook system to automatically inject cached context at session start and trigger file summary updates after edits.
+
+## Overview
+
+TokenStash implements two hooks:
+
+<CardGroup cols={2}>
+  <Card title="SessionStart" icon="play">
+    Injects cached stash context at the beginning of every Claude session
+  </Card>
+  <Card title="PostToolUse" icon="pen">
+    Triggers file summary updates after Write/Edit tool calls
+  </Card>
+</CardGroup>
+
+## Hook Configuration
+
+Hooks are defined in `hooks/hooks.json`:
+
+```json hooks/hooks.json
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd' session-start",
+            "async": false
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'${CLAUDE_PLUGIN_ROOT}/hooks/run-hook.cmd' post-tool-use",
+            "async": true
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### Configuration Fields
+
+<ResponseField name="hooks" type="object" required>
+  Container for all hook definitions
+  
+  <Expandable title="properties">
+    <ResponseField name="SessionStart" type="array">
+      Hook configurations for session start events
+    </ResponseField>
+    
+    <ResponseField name="PostToolUse" type="array">
+      Hook configurations for post-tool-use events
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="matcher" type="string" required>
+  Regex pattern to match hook trigger conditions
+  
+  - **SessionStart**: Matches `startup|resume|clear|compact` session types
+  - **PostToolUse**: Matches `Write|Edit` tool names
+</ResponseField>
+
+<ResponseField name="type" type="string" required>
+  Hook execution type. Always `"command"` for TokenStash hooks.
+</ResponseField>
+
+<ResponseField name="command" type="string" required>
+  Shell command to execute. Uses `${CLAUDE_PLUGIN_ROOT}` variable to reference plugin directory.
+</ResponseField>
+
+<ResponseField name="async" type="boolean" required>
+  Whether hook runs asynchronously
+  
+  - **SessionStart**: `false` (blocks session start until context loads)
+  - **PostToolUse**: `true` (doesn't block file operations)
+</ResponseField>
+
+## SessionStart Hook
+
+### Purpose
+
+Loads cached context from `.tokenstash/` directories and injects it into Claude's context at the beginning of every session.
+
+### Execution Flow
+
+1. **Locate stash directories**
+   - Global: `~/.claude/tokenstash/`
+   - Project: `<repo-root>/.tokenstash/`
+
+2. **Load global files** (if they exist):
+   - `preferences.md`
+   - `rules.md`
+
+3. **Load project files** (takes priority):
+   - `architecture.md`
+   - `decisions.md`
+   - `rules.md`
+   - All files in `files/*.md`
+
+4. **Build context string** with file summaries
+
+5. **Return JSON response** with context injected
+
+### Implementation
+
+```bash hooks/session-start
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
+PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# Support test overrides
+if [ -n "${TOKENSTASH_TEST_DIR:-}" ]; then
+    GLOBAL_STASH_DIR="${TOKENSTASH_TEST_DIR}/global"
+else
+    GLOBAL_STASH_DIR="${HOME}/.claude/tokenstash"
+fi
+
+# Find project stash: use test override or find git repo root
+if [ -n "${TOKENSTASH_TEST_PROJECT_DIR:-}" ]; then
+    PROJECT_STASH_DIR="$TOKENSTASH_TEST_PROJECT_DIR"
+else
+    GIT_ROOT=$(git -C "${PWD}" rev-parse --show-toplevel 2>/dev/null || echo "")
+    PROJECT_STASH_DIR="${GIT_ROOT}/.tokenstash"
+fi
+
+# Build context from stash files
+context=""
+
+# Load global stash
+if [ -d "$GLOBAL_STASH_DIR" ]; then
+    for f in preferences.md rules.md; do
+        fpath="$GLOBAL_STASH_DIR/$f"
+        if [ -f "$fpath" ]; then
+            context+="## Global: $f\n$(cat "$fpath")\n\n"
+        fi
+    done
+fi
+
+# Load project stash (takes priority)
+if [ -d "$PROJECT_STASH_DIR" ]; then
+    for f in architecture.md decisions.md rules.md; do
+        fpath="$PROJECT_STASH_DIR/$f"
+        if [ -f "$fpath" ]; then
+            context+="## Project: $f\n$(cat "$fpath")\n\n"
+        fi
+    done
+    # Load file summaries
+    if [ -d "$PROJECT_STASH_DIR/files" ]; then
+        file_count=$(find "$PROJECT_STASH_DIR/files" -name "*.md" | wc -l | tr -d ' ')
+        if [ "$file_count" -gt 0 ]; then
+            context+="## File Summaries ($file_count files cached)\n"
+            for f in "$PROJECT_STASH_DIR/files/"*.md; do
+                [ -f "$f" ] || continue
+                fname=$(basename "$f" .md | tr '__' '/')
+                context+="### $fname\n$(cat "$f")\n\n"
+            done
+        fi
+    fi
+fi
+
+if [ -z "$context" ]; then
+    context="TokenStash: No stash found. Run /stash-scan to index this project."
+fi
+
+full_context="<tokenstash>\n${context}\n</tokenstash>"
+escaped=$(escape_for_json "$full_context")
+
+cat <<JSONEOF
+{
+  "additional_context": "${escaped}",
+  "hookSpecificOutput": {
+    "hookEventName": "SessionStart",
+    "additionalContext": "${escaped}"
+  }
+}
+JSONEOF
+```
+
+### Output Format
+
+<ResponseField name="additional_context" type="string" required>
+  The full stash context wrapped in `<tokenstash>` tags, JSON-escaped
+</ResponseField>
+
+<ResponseField name="hookSpecificOutput" type="object" required>
+  Hook-specific metadata
+  
+  <Expandable title="properties">
+    <ResponseField name="hookEventName" type="string">
+      Always `"SessionStart"`
+    </ResponseField>
+    
+    <ResponseField name="additionalContext" type="string">
+      Duplicate of `additional_context` for hook system compatibility
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Context Structure
+
+The injected context follows this format:
+
+```xml
+<tokenstash>
+## Global: preferences.md
+[global preferences content]
+
+## Global: rules.md
+[global rules content]
+
+## Project: architecture.md
+[project architecture content]
+
+## Project: decisions.md
+[project decisions content]
+
+## Project: rules.md
+[project rules content]
+
+## File Summaries (42 files cached)
+### src/index.ts
+**Purpose:** Main entry point for the application.
+**Key exports:** startServer, config
+**Patterns:** Uses async/await for initialization
+**Last updated:** 2026-03-10
+
+### src/utils/helpers.ts
+[file summary content]
+</tokenstash>
+```
+
+<Note>
+Project files take priority over global files. If both `~/.claude/tokenstash/rules.md` and `.tokenstash/rules.md` exist, only the project version is loaded.
+</Note>
+
+## PostToolUse Hook
+
+### Purpose
+
+Triggers a reminder to update file summaries after Claude edits or writes a file.
+
+### Execution Flow
+
+1. **Read tool use JSON** from stdin
+2. **Extract tool name and file path** using Python JSON parser
+3. **Filter tool calls**:
+   - Only process `Write` and `Edit` tools
+   - Ignore calls without a `file_path` parameter
+4. **Return reminder** to invoke `tokenstash:auto-update` skill
+
+### Implementation
+
+```bash hooks/post-tool-use
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Read JSON payload from stdin
+input=$(cat)
+
+# Extract tool name and file path using python3
+tool_name=$(echo "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tool_name',''))" 2>/dev/null || echo "")
+file_path=$(echo "$input" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tool_input',{}).get('file_path',''))" 2>/dev/null || echo "")
+
+# Only act on Write and Edit tool calls with a file path
+if [[ "$tool_name" != "Write" && "$tool_name" != "Edit" ]] || [ -z "$file_path" ]; then
+    cat << 'JSONEOF'
+{"no_op": true}
+JSONEOF
+    exit 0
+fi
+
+filename=$(basename "$file_path")
+reminder="<tokenstash-reminder>You just edited \`${file_path}\`. Use the tokenstash:auto-update skill to update its summary in .tokenstash/files/ now.</tokenstash-reminder>"
+escaped=$(escape_for_json "$reminder")
+
+cat << JSONEOF
+{
+  "additional_context": "${escaped}",
+  "hookSpecificOutput": {
+    "hookEventName": "PostToolUse",
+    "additionalContext": "${escaped}"
+  }
+}
+JSONEOF
+```
+
+### Input Format
+
+The hook receives JSON from stdin:
+
+```json
+{
+  "tool_name": "Write",
+  "tool_input": {
+    "file_path": "/path/to/file.ts",
+    "content": "..."
+  }
+}
+```
+
+### Output Format
+
+<ResponseField name="no_op" type="boolean">
+  Returned when hook should not act (non-Write/Edit tool or missing file path)
+</ResponseField>
+
+<ResponseField name="additional_context" type="string">
+  Reminder message wrapped in `<tokenstash-reminder>` tags
+</ResponseField>
+
+<ResponseField name="hookSpecificOutput" type="object">
+  Hook-specific metadata
+  
+  <Expandable title="properties">
+    <ResponseField name="hookEventName" type="string">
+      Always `"PostToolUse"`
+    </ResponseField>
+    
+    <ResponseField name="additionalContext" type="string">
+      Duplicate of `additional_context`
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Cross-Platform Wrapper
+
+The `run-hook.cmd` script provides cross-platform compatibility:
+
+```bash hooks/run-hook.cmd
+: << 'CMDBLOCK'
+@echo off
+REM Cross-platform polyglot wrapper for hook scripts.
+set "HOOK_DIR=%~dp0"
+if exist "C:\Program Files\Git\bin\bash.exe" (
+    "C:\Program Files\Git\bin\bash.exe" "%HOOK_DIR%%~1" %2 %3 %4 %5
+    exit /b %ERRORLEVEL%
+)
+where bash >nul 2>nul
+if %ERRORLEVEL% equ 0 (
+    bash "%HOOK_DIR%%~1" %2 %3 %4 %5
+    exit /b %ERRORLEVEL%
+)
+exit /b 0
+CMDBLOCK
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_NAME="$1"
+shift
+exec bash "${SCRIPT_DIR}/${SCRIPT_NAME}" "$@"
+```
+
+<Note>
+This polyglot script works as both a Windows `.cmd` file and a Unix shell script. On Windows, it attempts to find Git Bash; on Unix, it directly executes the hook script.
+</Note>
+
+## Testing
+
+TokenStash includes test scripts for both hooks:
+
+```bash
+# Test session-start hook
+bash hooks/tests/test-session-start.sh
+
+# Test post-tool-use hook
+bash hooks/tests/test-post-tool-use.sh
+```
+
+### Environment Variables for Testing
+
+<ResponseField name="TOKENSTASH_TEST_DIR" type="string">
+  Override global stash directory (defaults to `~/.claude/tokenstash`)
+</ResponseField>
+
+<ResponseField name="TOKENSTASH_TEST_PROJECT_DIR" type="string">
+  Override project stash directory (defaults to `<git-root>/.tokenstash`)
+</ResponseField>
+
+## Helper Functions
+
+### escape_for_json
+
+Both hooks use this function to escape strings for JSON output:
+
+```bash
+escape_for_json() {
+    local s="$1"
+    s="${s//\\/\\\\}"
+    s="${s//\"/\\\"}"
+    s="${s//$'\n'/\\n}"
+    s="${s//$'\r'/\\r}"
+    s="${s//$'\t'/\\t}"
+    printf '%s' "$s"
+}
+```
+
+Escapes:
+- Backslashes (`\` → `\\`)
+- Double quotes (`"` → `\"`)
+- Newlines (`\n` → `\\n`)
+- Carriage returns (`\r` → `\\r`)
+- Tabs (`\t` → `\\t`)

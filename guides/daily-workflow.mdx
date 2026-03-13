@@ -1,0 +1,338 @@
+---
+title: Daily Workflow
+description: How to use TokenStash in your everyday development
+---
+
+TokenStash works automatically, but knowing when to use each command helps you build better context over time. Here's how to integrate it into your daily workflow.
+
+## Starting Your Day
+
+When you open Claude Code, TokenStash automatically injects your project context.
+
+<Steps>
+  <Step title="Launch Claude Code">
+    Open your project in Claude Code. The stash is loaded automatically at session start.
+  </Step>
+
+  <Step title="Verify context">
+    Ask Claude about your project:
+    
+    ```
+    What are the key components in this codebase?
+    ```
+    
+    Claude should respond using information from your stash without reading files.
+  </Step>
+
+  <Step title="Start working">
+    Begin coding. TokenStash silently updates file summaries as you edit.
+  </Step>
+</Steps>
+
+<Tip>
+You don't need to do anything special — just start coding. The stash builds automatically.
+</Tip>
+
+## During Development
+
+### Automatic Updates (No Action Required)
+
+TokenStash automatically updates summaries whenever you edit files:
+
+```bash
+# You edit src/api/users.ts
+# TokenStash silently updates .tokenstash/files/src__api__users.md
+```
+
+<Note>
+**Behind the scenes:** TokenStash uses a `PostToolUse` hook that triggers after every `Write` or `Edit` operation. You won't see any output — it just works.
+</Note>
+
+### When to Run `/stash-save`
+
+Run this command at the end of a work session to capture decisions and architecture changes:
+
+<CardGroup cols={2}>
+  <Card title="After implementing a feature" icon="check">
+    Document what you built and why
+  </Card>
+  
+  <Card title="After refactoring" icon="rotate">
+    Record architectural changes
+  </Card>
+  
+  <Card title="After making key decisions" icon="lightbulb">
+    Log the decision and rationale
+  </Card>
+  
+  <Card title="Before ending a session" icon="door-open">
+    Preserve context for next time
+  </Card>
+</CardGroup>
+
+### Running `/stash-save`
+
+Execute the save command:
+
+```bash
+/stash-save
+```
+
+This will:
+1. Append to `decisions.md` with session summary
+2. Update `architecture.md` if structure changed
+3. Sweep and update any missing file summaries
+
+<Accordion title="Example: What gets saved">
+**decisions.md entry:**
+```markdown
+## 2026-03-13 — Added user authentication system
+
+**Decisions:**
+- Used JWT tokens over sessions for stateless auth
+- Implemented refresh token rotation for security
+- Stored hashed passwords with bcrypt (cost factor 12)
+
+**Files changed:** src/auth/jwt.ts, src/api/login.ts, src/middleware/auth.ts
+```
+
+**architecture.md update:**
+```markdown
+## Key Components
+- `src/auth/`: JWT-based authentication system (NEW)
+- `src/api/`: REST API endpoints and middleware
+- `src/services/`: Business logic and database operations
+```
+</Accordion>
+
+## Common Scenarios
+
+### Scenario 1: Starting a New Feature
+
+<Steps>
+  <Step title="Check existing context">
+    Ask Claude what's already in the codebase:
+    
+    ```
+    Do we have any existing authentication code?
+    ```
+    
+    Claude uses the stash to answer without re-reading files.
+  </Step>
+
+  <Step title="Implement the feature">
+    Code normally. File summaries update automatically as you work.
+  </Step>
+
+  <Step title="Save decisions">
+    When done:
+    
+    ```bash
+    /stash-save
+    ```
+    
+    This captures your implementation decisions for future reference.
+  </Step>
+</Steps>
+
+### Scenario 2: Onboarding to a New Project
+
+<Steps>
+  <Step title="Clone and scan">
+    ```bash
+    git clone <repo-url>
+    cd <project>
+    # In Claude Code:
+    /stash-scan
+    ```
+  </Step>
+
+  <Step title="Review the stash">
+    Ask Claude:
+    
+    ```
+    Explain the architecture of this project
+    What patterns are used here?
+    What are the main components?
+    ```
+    
+    Claude answers using the stash, giving you instant onboarding.
+  </Step>
+
+  <Step title="Start contributing">
+    Begin coding. The stash keeps Claude informed as you make changes.
+  </Step>
+</Steps>
+
+### Scenario 3: Debugging a Complex Issue
+
+<Steps>
+  <Step title="Use existing context">
+    Ask Claude about the relevant components:
+    
+    ```
+    What does src/services/payment.ts do?
+    How does the order processing flow work?
+    ```
+    
+    The stash provides immediate answers.
+  </Step>
+
+  <Step title="Read code as needed">
+    When you need details, Claude reads specific files. Those files are auto-summarized after any edits.
+  </Step>
+
+  <Step title="Document the fix">
+    After fixing:
+    
+    ```bash
+    /stash-save
+    ```
+    
+    Record what the bug was and how you fixed it.
+  </Step>
+</Steps>
+
+### Scenario 4: Major Refactoring
+
+<Steps>
+  <Step title="Before refactoring">
+    Optional: Save the current state:
+    
+    ```bash
+    /stash-save
+    ```
+  </Step>
+
+  <Step title="Refactor code">
+    Make your changes. File summaries update automatically.
+  </Step>
+
+  <Step title="Force re-scan (optional)">
+    If you moved/renamed many files:
+    
+    ```bash
+    /stash-scan --force
+    ```
+    
+    This rebuilds all summaries from scratch.
+  </Step>
+
+  <Step title="Document changes">
+    ```bash
+    /stash-save
+    ```
+    
+    Capture the refactoring decisions and new architecture.
+  </Step>
+</Steps>
+
+## End of Session Checklist
+
+Before closing Claude Code:
+
+- [ ] Run `/stash-save` to capture decisions
+- [ ] Verify important file summaries are current
+- [ ] Commit `.tokenstash/` if you're sharing with a team
+- [ ] Check `decisions.md` has a clear session summary
+
+<Warning>
+If you forget to run `/stash-save`, file summaries are still updated automatically. You'll only miss the session-level decisions and architecture updates.
+</Warning>
+
+## Working Across Multiple Sessions
+
+TokenStash makes resuming work seamless:
+
+<Steps>
+  <Step title="Session 1: Initial work">
+    Implement feature, run `/stash-save` at the end.
+  </Step>
+
+  <Step title="Between sessions">
+    The stash is saved in `.tokenstash/`. Nothing lost.
+  </Step>
+
+  <Step title="Session 2: Resume">
+    Start Claude Code. Stash is auto-injected. Claude remembers everything from Session 1.
+  </Step>
+</Steps>
+
+<Tip>
+**Pro tip:** Read through `decisions.md` periodically. It's a living log of your project's evolution.
+</Tip>
+
+## Team Workflows
+
+When working in a team:
+
+### Pull Changes
+
+When you pull teammate changes:
+
+```bash
+git pull
+# The updated .tokenstash/ is pulled too
+# Start Claude Code — context is current
+```
+
+<Note>
+No need to re-scan. Your teammates' stash updates are already in `.tokenstash/`.
+</Note>
+
+### Push Changes
+
+After your work:
+
+```bash
+/stash-save  # Save your session
+git add .tokenstash/
+git commit -m "feat: add user auth + update stash"
+git push
+```
+
+Your teammates now get your context automatically.
+
+### Merge Conflicts
+
+If `.tokenstash/` has merge conflicts:
+
+<Steps>
+  <Step title="Resolve conflicts">
+    Treat stash files like documentation. Merge manually or pick one version.
+  </Step>
+
+  <Step title="Re-scan if needed">
+    If the stash is too messy:
+    
+    ```bash
+    /stash-clear
+    /stash-scan
+    ```
+    
+    Rebuild from scratch.
+  </Step>
+</Steps>
+
+## Quick Reference
+
+| When to use | Command | What it does |
+|-------------|---------|-------------|
+| First time in project | `/stash-scan` | Build initial stash |
+| During coding | (automatic) | File summaries update silently |
+| End of session | `/stash-save` | Save decisions and architecture |
+| After major refactor | `/stash-scan --force` | Rebuild entire stash |
+| Start fresh | `/stash-clear` | Wipe the project stash |
+| Every session start | (automatic) | Stash injected into context |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Best Practices" icon="star" href="/guides/best-practices">
+    Learn how to optimize your stash
+  </Card>
+  
+  <Card title="Troubleshooting" icon="wrench" href="/guides/troubleshooting">
+    Fix common issues
+  </Card>
+</CardGroup>

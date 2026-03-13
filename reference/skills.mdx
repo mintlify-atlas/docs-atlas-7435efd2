@@ -1,0 +1,516 @@
+---
+title: Skill System
+description: Technical reference for TokenStash's skill definitions
+---
+
+TokenStash provides three skills that Claude invokes to manage the local context cache. Skills are loaded automatically by Claude Code when referenced.
+
+## Overview
+
+<CardGroup cols={3}>
+  <Card title="scan" icon="magnifying-glass">
+    Index entire repository and build initial stash
+  </Card>
+  <Card title="save" icon="floppy-disk">
+    Save full session summary with decisions and architecture
+  </Card>
+  <Card title="auto-update" icon="rotate">
+    Update single file summary after edits
+  </Card>
+</CardGroup>
+
+## Skill: scan
+
+### Metadata
+
+<ResponseField name="name" type="string" required>
+  `scan`
+</ResponseField>
+
+<ResponseField name="description" type="string" required>
+  Scan the repo and build the full TokenStash index
+</ResponseField>
+
+### Purpose
+
+Scans the entire project repository and creates comprehensive summaries for all files, plus a high-level architecture overview.
+
+### Invocation
+
+Users trigger this skill with:
+
+```bash
+/stash-scan          # Scan new files only
+/stash-scan --force  # Overwrite all existing summaries
+```
+
+### Workflow
+
+#### 1. Find Repository Root
+
+Use Git to locate the repository root:
+
+```bash
+git rev-parse --show-toplevel
+```
+
+All stash files are written to `<repo-root>/.tokenstash/`.
+
+#### 2. Discover Files
+
+List all files in the repository, excluding:
+
+<ResponseField name="Excluded directories" type="array">
+  - `.git/`
+  - `node_modules/`
+  - `.tokenstash/`
+  - `dist/`
+  - `build/`
+  - `.next/`
+</ResponseField>
+
+<ResponseField name="Excluded file types" type="array">
+  - Binary files (images, fonts, compiled artifacts)
+  - Files over 500 lines (skip with note)
+</ResponseField>
+
+#### 3. Summarize Each File
+
+For each discovered file:
+
+<Note>
+If `--force` flag is NOT provided, skip files that already have summaries in `.tokenstash/files/`.
+</Note>
+
+**Read the file** and write a summary to:
+
+```
+.tokenstash/files/<flattened-path>.md
+```
+
+Where `<flattened-path>` replaces `/` with `__`:
+
+- `src/lib/utils.ts` → `src__lib__utils.md`
+- `app/api/route.ts` → `app__api__route.md`
+
+**Summary format:**
+
+```markdown
+**Purpose:** One sentence description.
+**Key exports:** Main functions/classes/constants.
+**Patterns:** Notable patterns used.
+**Last updated:** YYYY-MM-DD
+```
+
+<Expandable title="Example: src__lib__utils.md">
+```markdown
+**Purpose:** Utility functions for string manipulation and data formatting.
+**Key exports:** formatDate, slugify, truncate, parseMarkdown
+**Patterns:** Pure functions, no side effects
+**Last updated:** 2026-03-13
+```
+</Expandable>
+
+#### 4. Write architecture.md
+
+Based on the full codebase analysis, write `.tokenstash/architecture.md`:
+
+```markdown
+## Architecture Overview
+[2-4 sentences describing overall structure]
+
+## Key Components
+- `path/to/module`: description
+- `path/to/module`: description
+
+## Patterns
+- [notable patterns observed]
+
+## Tech Stack
+- [main technologies and frameworks]
+```
+
+<Expandable title="Example: architecture.md">
+```markdown
+## Architecture Overview
+Next.js 14 application using App Router with TypeScript. API routes handle backend logic, with client components for interactive UI. Data fetching uses server components where possible.
+
+## Key Components
+- `app/`: Next.js App Router pages and layouts
+- `components/`: Reusable React components
+- `lib/`: Utility functions and shared logic
+- `hooks/`: Custom React hooks
+- `api/`: Backend API route handlers
+
+## Patterns
+- Server Components by default, Client Components only when needed
+- API routes use edge runtime for performance
+- Shared TypeScript types in `types/` directory
+- Environment variables via `.env.local`
+
+## Tech Stack
+- Next.js 14 (React 18)
+- TypeScript
+- Tailwind CSS
+- Vercel deployment
+```
+</Expandable>
+
+#### 5. Report Results
+
+Inform the user:
+
+```
+TokenStash scan complete.
+- Summarized: 87 files
+- Written to: /path/to/repo/.tokenstash/
+- Run /stash-save to add session notes.
+```
+
+### Full Skill Definition
+
+```markdown skills/scan/SKILL.md
+---
+name: scan
+description: Scan the repo and build the full TokenStash index
+---
+
+# TokenStash: Scan Repository
+
+Scan the project and build or refresh the stash. Check if `--force` was passed — if so, overwrite existing summaries. Otherwise skip files that already have summaries.
+
+## Steps
+
+### 1. Find repo root
+Use `git rev-parse --show-toplevel` to find the repo root. All stash files go in `<repo-root>/.tokenstash/`.
+
+### 2. Discover files
+List all files in the repo, excluding:
+- `.git/`, `node_modules/`, `.tokenstash/`, `dist/`, `build/`, `.next/`
+- Binary files (images, fonts, compiled artifacts)
+- Files over 500 lines (skip with a note)
+
+### 3. Summarize each file
+For each file not yet summarized (or all files if `--force`):
+- Read the file
+- Write `.tokenstash/files/<flattened-path>.md` with:
+  ```
+  **Purpose:** One sentence.
+  **Key exports:** Main functions/classes/constants.
+  **Patterns:** Notable patterns.
+  **Last updated:** YYYY-MM-DD
+  ```
+
+### 4. Write architecture.md
+Based on the full picture of the codebase, write `.tokenstash/architecture.md`:
+```
+## Architecture Overview
+[2-4 sentences]
+
+## Key Components
+- `path/`: description
+...
+
+## Patterns
+- [patterns observed]
+
+## Tech Stack
+- [main technologies]
+```
+
+### 5. Report
+Tell the user how many files were summarized and where the stash was written.
+```
+
+## Skill: save
+
+### Metadata
+
+<ResponseField name="name" type="string" required>
+  `save`
+</ResponseField>
+
+<ResponseField name="description" type="string" required>
+  Save a full session summary to the TokenStash
+</ResponseField>
+
+### Purpose
+
+Captures session decisions, updates architecture if needed, and ensures all edited files have summaries.
+
+### Invocation
+
+Users trigger this skill with:
+
+```bash
+/stash-save
+```
+
+### Workflow
+
+#### 1. Update decisions.md
+
+Append to `.tokenstash/decisions.md` (create if missing):
+
+```markdown
+## YYYY-MM-DD — <one-line session summary>
+
+**Decisions:**
+- [What was decided and why]
+- [Another decision if applicable]
+
+**Files changed:** file1.ts, file2.py
+```
+
+<Expandable title="Example: decisions.md entry">
+```markdown
+## 2026-03-13 — Added user authentication system
+
+**Decisions:**
+- Used NextAuth.js instead of custom auth to reduce maintenance burden
+- Stored sessions in Redis for faster lookups and easy scaling
+- Implemented email + password auth first, will add OAuth later
+
+**Files changed:** lib/auth.ts, app/api/auth/[...nextauth]/route.ts, middleware.ts
+```
+</Expandable>
+
+#### 2. Update architecture.md
+
+<Note>
+Only update if the codebase structure changed during the session (new modules, changed patterns, new dependencies). If nothing structural changed, leave it alone.
+</Note>
+
+If updates are needed, rewrite `.tokenstash/architecture.md` to reflect current state:
+
+```markdown
+## Architecture Overview
+[2-4 sentences describing the overall structure]
+
+## Key Components
+- `path/to/module`: what it does
+- `path/to/module`: what it does
+
+## Patterns
+- [notable patterns used]
+```
+
+#### 3. Sweep File Summaries
+
+For every file edited or read during the session:
+
+1. Check if `.tokenstash/files/<flattened-path>.md` exists
+2. If missing, create it using the `auto-update` format:
+
+```markdown
+**Purpose:** One sentence — what this file does.
+**Key exports:** List main functions/classes/constants.
+**Patterns:** Any notable patterns.
+**Last updated:** YYYY-MM-DD
+```
+
+#### 4. Report Completion
+
+Inform the user:
+
+```
+TokenStash saved. Session summary written to .tokenstash/decisions.md.
+```
+
+### Full Skill Definition
+
+```markdown skills/save/SKILL.md
+---
+name: save
+description: Save a full session summary to the TokenStash
+---
+
+# TokenStash: Save Session
+
+Do a full stash save now. Work through these steps:
+
+## 1. Update decisions.md
+
+Append to `.tokenstash/decisions.md` (create if missing):
+
+```markdown
+## YYYY-MM-DD — <one-line session summary>
+
+**Decisions:**
+- [What was decided and why]
+- [Another decision if applicable]
+
+**Files changed:** file1.ts, file2.py
+```
+
+## 2. Update architecture.md
+
+If the codebase structure changed this session (new modules, changed patterns, new dependencies), rewrite `.tokenstash/architecture.md` to reflect the current state. If nothing structural changed, leave it alone.
+
+Format:
+```
+## Architecture Overview
+[2-4 sentences describing the overall structure]
+
+## Key Components
+- `path/to/module`: what it does
+- `path/to/module`: what it does
+
+## Patterns
+- [notable patterns used]
+```
+
+## 3. Sweep file summaries
+
+For every file you edited or read this session that doesn't have a current summary in `.tokenstash/files/`, write one now using the auto-update format (Purpose / Key exports / Patterns / Last updated).
+
+## 4. Done
+
+Tell the user: "TokenStash saved. Session summary written to .tokenstash/decisions.md."
+```
+
+## Skill: auto-update
+
+### Metadata
+
+<ResponseField name="name" type="string" required>
+  `auto-update`
+</ResponseField>
+
+<ResponseField name="description" type="string" required>
+  Update the TokenStash file summary for a file you just edited
+</ResponseField>
+
+### Purpose
+
+Automatically updates the summary for a single file immediately after Claude edits it. This keeps the stash current without requiring manual `/stash-save` commands.
+
+### Invocation
+
+Triggered automatically by the `PostToolUse` hook after Write/Edit operations:
+
+```xml
+<tokenstash-reminder>
+You just edited `src/lib/utils.ts`. Use the tokenstash:auto-update skill to update its summary in .tokenstash/files/ now.
+</tokenstash-reminder>
+```
+
+### Workflow
+
+#### 1. Determine File Path
+
+Convert the file path to flattened format:
+
+```
+src/lib/utils.ts → src__lib__utils.md
+app/api/route.ts → app__api__route.md
+```
+
+#### 2. Write Summary
+
+Create or update `.tokenstash/files/<flattened-path>.md`:
+
+```markdown
+**Purpose:** One sentence — what this file does.
+**Key exports:** List the main functions/classes/constants exported.
+**Patterns:** Any notable patterns (e.g. "uses factory pattern", "singleton").
+**Last updated:** YYYY-MM-DD
+```
+
+<Note>
+**Keep it under 5 lines.** The goal is to help future Claude skip re-reading the file, not fully understand it.
+</Note>
+
+#### 3. Handle Edge Cases
+
+<ResponseField name="Boilerplate files" type="string">
+  Do not summarize files with only imports, types, or empty content
+</ResponseField>
+
+<ResponseField name="Deleted files" type="string">
+  If the file was deleted, remove its summary from `.tokenstash/files/`
+</ResponseField>
+
+<ResponseField name="Directory creation" type="string">
+  Create `.tokenstash/files/` directory if it doesn't exist
+</ResponseField>
+
+#### 4. Silent Execution
+
+<Note>
+This skill runs silently. Do NOT notify the user unless an error occurs.
+</Note>
+
+### Full Skill Definition
+
+```markdown skills/auto-update/SKILL.md
+---
+name: auto-update
+description: Update the TokenStash file summary for a file you just edited
+---
+
+# TokenStash: Auto-Update File Summary
+
+You just edited a file. Update its summary in the stash now.
+
+## What to write
+
+Find or create `.tokenstash/files/<flattened-path>.md` where `<flattened-path>` replaces `/` with `__` (e.g. `src/lib/utils.ts` → `src__lib__utils.md`).
+
+Write a summary with this exact structure (3-5 lines max, no fluff):
+
+```
+**Purpose:** One sentence — what this file does.
+**Key exports:** List the main functions/classes/constants exported.
+**Patterns:** Any notable patterns (e.g. "uses factory pattern", "singleton").
+**Last updated:** YYYY-MM-DD
+```
+
+## Rules
+
+- Keep it under 5 lines. Future Claude needs to skip re-reading this file, not understand it fully.
+- Do not summarize boilerplate (imports, types only, empty files).
+- If the file was deleted, delete its summary too.
+- Create `.tokenstash/files/` if it doesn't exist yet.
+- Do this silently — no need to tell the user unless there's an error.
+```
+
+## Skill Loading
+
+Skills are loaded by Claude Code's skill system when referenced. The skill name format is:
+
+```
+tokenstash:<skill-name>
+```
+
+Examples:
+- `tokenstash:scan`
+- `tokenstash:save`
+- `tokenstash:auto-update`
+
+## Skill File Structure
+
+Each skill is a Markdown file with YAML frontmatter:
+
+```markdown
+---
+name: skill-name
+description: Brief description for skill selection
+---
+
+# Skill Title
+
+[Detailed instructions for Claude]
+```
+
+<ResponseField name="name" type="string" required>
+  Skill identifier (lowercase, hyphenated)
+</ResponseField>
+
+<ResponseField name="description" type="string" required>
+  Brief description shown in skill selection UI
+</ResponseField>
+
+<ResponseField name="content" type="markdown" required>
+  Detailed step-by-step instructions for Claude to follow
+</ResponseField>

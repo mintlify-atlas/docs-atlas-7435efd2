@@ -1,0 +1,224 @@
+---
+title: First-Time Setup
+description: Get TokenStash up and running in your project
+---
+
+TokenStash works automatically once installed, but a proper first-time setup will give you the best results. This guide walks you through getting started.
+
+## Installation
+
+<Steps>
+  <Step title="Register the marketplace">
+    Open Claude Code and register the TokenStash marketplace:
+
+    ```bash
+    /plugin marketplace add abhinavdubeyad9/tokenstash
+    ```
+  </Step>
+
+  <Step title="Install the plugin">
+    Install TokenStash:
+
+    ```bash
+    /plugin install tokenstash@tokenstash
+    ```
+  </Step>
+
+  <Step title="Start a new session">
+    Restart Claude Code or start a new session. Your stash will be automatically injected into Claude's context going forward.
+  </Step>
+</Steps>
+
+## Initial Project Scan
+
+For existing projects, you'll want to build an initial stash. This gives Claude immediate context about your entire codebase.
+
+<Steps>
+  <Step title="Navigate to your project">
+    Open Claude Code in your project directory (must be a git repository).
+  </Step>
+
+  <Step title="Run the initial scan">
+    Execute the scan command:
+
+    ```bash
+    /stash-scan
+    ```
+
+    This will:
+    - Discover all files in your repository
+    - Generate summaries for each file (under 5 lines each)
+    - Create an architecture overview
+    - Save everything to `.tokenstash/`
+  </Step>
+
+  <Step title="Review the generated stash">
+    Check the `.tokenstash/` directory to see what was created:
+
+    - `architecture.md` — High-level codebase structure
+    - `files/` — Individual file summaries
+  </Step>
+</Steps>
+
+<Note>
+The scan excludes large files (over 500 lines), binaries, and common directories like `node_modules/`, `dist/`, and `.git/`.
+</Note>
+
+## Understanding Stash Locations
+
+TokenStash supports two levels of context:
+
+<CardGroup cols={2}>
+  <Card title="Global Stash" icon="globe">
+    **Location:** `~/.claude/tokenstash/`
+    
+    Applies to all projects. Use for personal preferences, common patterns, or coding style rules.
+  </Card>
+
+  <Card title="Project Stash" icon="folder">
+    **Location:** `<repo-root>/.tokenstash/`
+    
+    Project-specific context. Takes precedence over global stash. Auto-created when you run commands.
+  </Card>
+</CardGroup>
+
+<Tip>
+**Priority:** Project stash always overrides global stash. Use global for general preferences, project for specific context.
+</Tip>
+
+## What Gets Created
+
+After your first scan, you'll see this structure:
+
+```
+.tokenstash/
+├── architecture.md    # Codebase overview, key components, patterns
+├── decisions.md       # Decision log (created after first /stash-save)
+├── rules.md          # Project rules (you create this manually)
+└── files/            # Per-file summaries
+    ├── src__index.md
+    ├── src__lib__utils.md
+    └── ...
+```
+
+<Accordion title="Example: File Summary">
+```markdown
+**Purpose:** Provides utility functions for string manipulation and validation.
+**Key exports:** `sanitizeInput`, `formatDate`, `validateEmail`
+**Patterns:** Pure functions with TypeScript generics.
+**Last updated:** 2026-03-13
+```
+</Accordion>
+
+<Accordion title="Example: Architecture Overview">
+```markdown
+## Architecture Overview
+Microservices architecture with event-driven communication. Backend in Node.js/Express, frontend in React with TypeScript. Uses PostgreSQL for persistence and Redis for caching.
+
+## Key Components
+- `src/api/`: REST API endpoints and middleware
+- `src/services/`: Business logic and database operations
+- `src/lib/`: Shared utilities and helpers
+- `src/types/`: TypeScript type definitions
+
+## Patterns
+- Repository pattern for database access
+- Dependency injection via constructor params
+- Factory functions for complex object creation
+
+## Tech Stack
+- Node.js, Express, TypeScript
+- PostgreSQL, Redis
+- Jest for testing
+```
+</Accordion>
+
+## Adding Project Rules
+
+Create a `rules.md` file in `.tokenstash/` to define project-specific conventions:
+
+```bash
+# Example .tokenstash/rules.md
+
+## Code Style
+- Use functional components with hooks (no class components)
+- Prefix private functions with underscore
+- Always include JSDoc comments for exported functions
+
+## Testing
+- Every feature must have unit tests
+- Use Jest with React Testing Library
+- Test file naming: `*.test.ts`
+
+## Architecture Rules
+- API calls only in service layer
+- No business logic in React components
+- Use custom hooks for stateful logic
+```
+
+<Warning>
+Manually created files like `rules.md` won't be auto-updated. Update them as your project evolves.
+</Warning>
+
+## Git Integration
+
+Decide whether to commit your stash:
+
+<Accordion title="Option 1: Commit the stash (recommended for teams)">
+  Committing `.tokenstash/` means:
+  - ✅ Team members get instant context
+  - ✅ New contributors onboard faster
+  - ✅ Architecture decisions are documented
+  
+  No action needed — just commit as normal.
+</Accordion>
+
+<Accordion title="Option 2: Keep stash local">
+  Add to your `.gitignore`:
+
+  ```bash
+  .tokenstash/
+  ```
+
+  Best for:
+  - Personal projects
+  - Experimental codebases
+  - When you want individual developer contexts
+</Accordion>
+
+## Verify Installation
+
+Confirm TokenStash is working:
+
+<Steps>
+  <Step title="Check plugin status">
+    ```bash
+    /plugin list
+    ```
+    You should see `tokenstash` in the installed plugins.
+  </Step>
+
+  <Step title="Test auto-injection">
+    Start a new Claude Code session and ask:
+    
+    "What do you know about this project?"
+    
+    Claude should reference your stash content without re-reading files.
+  </Step>
+
+  <Step title="Test auto-update">
+    Edit a file, then check `.tokenstash/files/` — you should see its summary updated automatically.
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Daily Workflow" icon="calendar" href="/guides/daily-workflow">
+    Learn how to use TokenStash in your daily development
+  </Card>
+  
+  <Card title="Best Practices" icon="star" href="/guides/best-practices">
+    Optimize your stash for maximum efficiency
+  </Card>
+</CardGroup>

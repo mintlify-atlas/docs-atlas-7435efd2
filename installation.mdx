@@ -1,0 +1,118 @@
+---
+title: Installation
+description: Install TokenStash to cache your project context locally
+---
+
+TokenStash is a Claude Code plugin that caches project context locally — so Claude starts every session already knowing your codebase. No re-reading files. No re-explaining architecture. Just start coding.
+
+## Prerequisites
+
+Before installing TokenStash, ensure you have:
+
+- Claude Code installed and running
+- A project with a Git repository (TokenStash uses the repo root to store project-specific context)
+
+## Installation Steps
+
+<Steps>
+  <Step title="Add the TokenStash marketplace">
+    Register the TokenStash marketplace to access the plugin:
+    
+    ```bash
+    /plugin marketplace add abhinavdubeyad9/tokenstash
+    ```
+    
+    This adds the TokenStash plugin repository to your available marketplaces.
+  </Step>
+
+  <Step title="Install the plugin">
+    Install TokenStash from the marketplace:
+    
+    ```bash
+    /plugin install tokenstash@tokenstash
+    ```
+    
+    <Note>
+      The plugin will be installed and automatically configured with all necessary hooks for session start and file edit tracking.
+    </Note>
+  </Step>
+
+  <Step title="Start a new session">
+    Start a new Claude Code session to activate TokenStash:
+    
+    - Close your current session
+    - Open a new session in your project directory
+    
+    TokenStash will automatically inject any existing stash into Claude's context at the start of every session.
+  </Step>
+</Steps>
+
+## Verify Installation
+
+To verify TokenStash is working correctly:
+
+1. Start a new Claude Code session in a project
+2. Run `/stash-scan` to create your first stash
+3. Close and restart the session
+4. You should see the stash context loaded automatically
+
+<Note>
+  On first install, TokenStash won't have any cached context yet. Run `/stash-scan` to build the initial index, or let it build up naturally as you work.
+</Note>
+
+## What Gets Installed
+
+TokenStash installs the following components:
+
+<CardGroup cols={2}>
+  <Card title="Session Hooks" icon="clock">
+    Automatically injects stash context at the start of every Claude session
+  </Card>
+  
+  <Card title="File Tracking" icon="file">
+    Monitors file edits and updates summaries automatically
+  </Card>
+  
+  <Card title="Slash Commands" icon="terminal">
+    Adds `/stash-save`, `/stash-scan`, and `/stash-clear` commands
+  </Card>
+  
+  <Card title="Skills" icon="wand-magic-sparkles">
+    Includes specialized skills for saving, scanning, and auto-updating
+  </Card>
+</CardGroup>
+
+## Stash Locations
+
+TokenStash stores context in two locations:
+
+| Scope | Path | Priority | Purpose |
+|-------|------|----------|----------|
+| **Global** | `~/.claude/tokenstash/` | Base | Applies to all projects (preferences, global rules) |
+| **Project** | `<repo-root>/.tokenstash/` | Override | Project-specific context (takes precedence) |
+
+<Note>
+  Project stash takes priority over global stash. Use global stash for preferences and rules that apply across all projects.
+</Note>
+
+## Git Configuration
+
+The stash contains summaries, not code — it's safe to commit. However, if you prefer to keep it local:
+
+```bash .gitignore
+.tokenstash/
+```
+
+<Warning>
+  If you're working in a team and want to share project context, **do not** add `.tokenstash/` to `.gitignore`. Committing the stash allows team members to benefit from the cached context.
+</Warning>
+
+## Next Steps
+
+<Card
+  title="Quick Start Guide"
+  icon="rocket"
+  href="/quickstart"
+>
+  Learn how to use TokenStash to cache your project context and accelerate your workflow
+</Card>

@@ -1,0 +1,419 @@
+---
+title: /stash-clear
+description: Wipe the TokenStash for the current project with confirmation
+---
+
+## Overview
+
+The `/stash-clear` command deletes the entire `.tokenstash/` directory for the current project. This is a destructive operation that requires explicit confirmation.
+
+<Warning>
+This command permanently deletes all stash data including decisions, architecture, and file summaries. Use with caution.
+</Warning>
+
+## Syntax
+
+```bash
+/stash-clear
+```
+
+<ParamField path="flags" type="none">
+  This command takes no flags or arguments.
+</ParamField>
+
+## Confirmation Flow
+
+When you run `/stash-clear`, TokenStash asks for explicit confirmation:
+
+```
+Are you sure you want to wipe .tokenstash/ for this project? Type YES to confirm.
+```
+
+### Confirming the Clear
+
+Type exactly `YES` (uppercase) to proceed:
+
+```
+YES
+```
+
+**Result:**
+- `.tokenstash/` directory is deleted
+- Confirmation message: `TokenStash cleared. Run /stash-scan to rebuild.`
+
+### Canceling the Clear
+
+Type anything other than `YES` to cancel:
+
+```
+no
+```
+
+**Result:**
+- No changes made
+- Message: `Stash was not cleared.`
+
+<Note>
+The confirmation must be exactly `YES` in all capitals. Any other response cancels the operation.
+</Note>
+
+## What Gets Deleted
+
+The command removes the entire `.tokenstash/` directory:
+
+```
+.tokenstash/
+├── architecture.md    ← Deleted
+├── decisions.md       ← Deleted
+├── rules.md          ← Deleted
+└── files/            ← Deleted
+    └── (all file summaries)
+```
+
+<Warning>
+All decisions, architecture notes, file summaries, and custom rules are permanently deleted. Make sure you want to start fresh.
+</Warning>
+
+## After Clearing
+
+After clearing the stash, you have several options:
+
+### 1. Rebuild with Scan
+
+```bash
+/stash-scan
+```
+
+Regenerates:
+- All file summaries
+- Architecture overview
+
+Does NOT restore:
+- Decision history
+- Manual notes or rules
+
+### 2. Start Fresh
+
+Simply continue working:
+
+- Auto-update will create summaries as you edit files
+- Use `/stash-save` to capture new decisions
+- Stash rebuilds organically over time
+
+### 3. Leave It Empty
+
+TokenStash works without a stash:
+
+- Claude operates normally without cached context
+- You can reinstall or rebuild later
+- No impact on code or git repository
+
+## Usage Examples
+
+### Starting Fresh After Major Refactor
+
+```bash
+# Codebase was completely restructured
+/stash-clear
+# Type: YES
+/stash-scan
+```
+
+**Result:**
+- Old stash deleted
+- New stash generated reflecting current structure
+
+### Fixing Incorrect Stash
+
+```bash
+# Stash contains outdated or wrong information
+/stash-clear
+# Type: YES
+/stash-save
+```
+
+**Result:**
+- Cleared bad data
+- Fresh session context captured
+
+### Switching Project Direction
+
+```bash
+# Pivoting to a completely different approach
+/stash-clear
+# Type: YES
+# Continue working naturally
+```
+
+**Result:**
+- Old context removed
+- New stash builds up as you work
+
+### Accidental Cancel
+
+```bash
+/stash-clear
+# Type: no
+# Nothing happens, stash is safe
+```
+
+## When to Use
+
+<CardGroup cols={2}>
+  <Card title="Major Refactoring" icon="code-branch">
+    After completely restructuring the codebase
+  </Card>
+  
+  <Card title="Incorrect Data" icon="triangle-exclamation">
+    When stash contains outdated or wrong information
+  </Card>
+  
+  <Card title="Fresh Start" icon="rotate">
+    Starting a new phase or pivoting project direction
+  </Card>
+  
+  <Card title="Testing" icon="flask">
+    Testing TokenStash behavior or debugging issues
+  </Card>
+</CardGroup>
+
+## Safety Features
+
+### Explicit Confirmation Required
+
+The command will NOT proceed without explicit `YES`:
+
+```bash
+/stash-clear
+# Waits for user input
+# Only accepts exactly "YES"
+```
+
+### No Cascade to Git
+
+Clearing the stash only affects `.tokenstash/`:
+
+- Source code is untouched
+- Git history is preserved
+- No files outside `.tokenstash/` are affected
+
+### Reversible via Rebuild
+
+While decisions are lost, file summaries can be regenerated:
+
+```bash
+/stash-scan --force
+```
+
+Regenerates all file summaries and architecture.
+
+<Note>
+Decision history cannot be recovered after clearing. Consider backing up `decisions.md` if you want to preserve it.
+</Note>
+
+## Preserving Data Before Clearing
+
+### Option 1: Commit to Git
+
+If `.tokenstash/` is tracked:
+
+```bash
+git add .tokenstash/
+git commit -m "Backup stash before clearing"
+/stash-clear
+```
+
+### Option 2: Manual Backup
+
+```bash
+cp -r .tokenstash/ .tokenstash.backup/
+/stash-clear
+# Can restore later if needed
+```
+
+### Option 3: Export Decisions
+
+```bash
+cat .tokenstash/decisions.md > ~/stash-backup-$(date +%Y%m%d).md
+/stash-clear
+```
+
+<Tip>
+If you're unsure, back up `decisions.md` first — it contains the most valuable context.
+</Tip>
+
+## What Doesn't Get Cleared
+
+### Global Stash
+
+The command only clears project-level stash:
+
+- `~/.claude/tokenstash/` is untouched
+- Global rules and context remain
+- Only `<repo-root>/.tokenstash/` is deleted
+
+### Git Ignore
+
+If you have `.tokenstash/` in `.gitignore`:
+
+- The ignore rule remains
+- No git changes result from clearing
+
+### Source Code
+
+All source code is preserved:
+
+- Only summaries are deleted, not actual code
+- Git history is untouched
+- No files outside `.tokenstash/` are affected
+
+## Alternatives to Clearing
+
+Before using `/stash-clear`, consider alternatives:
+
+### Selective Editing
+
+Edit specific files instead of clearing everything:
+
+```bash
+# Fix just the architecture
+nano .tokenstash/architecture.md
+
+# Remove a bad decision
+nano .tokenstash/decisions.md
+
+# Update a single file summary
+nano .tokenstash/files/src__utils.md
+```
+
+### Force Rescan
+
+Regenerate summaries without losing decisions:
+
+```bash
+/stash-scan --force
+```
+
+This overwrites file summaries but preserves `decisions.md`.
+
+### Incremental Save
+
+Update just the current session:
+
+```bash
+/stash-save
+```
+
+Appends to decisions and updates architecture without clearing history.
+
+## Troubleshooting
+
+### Command Does Nothing
+
+**Cause:** No `.tokenstash/` directory exists
+
+**Solution:**
+- Check if you're in the correct repository
+- Run `ls -la .tokenstash/` to verify
+- Nothing to clear if directory doesn't exist
+
+### Permission Denied
+
+**Cause:** Insufficient permissions to delete `.tokenstash/`
+
+**Solution:**
+```bash
+# Check permissions
+ls -ld .tokenstash/
+
+# Fix if needed
+chmod -R u+w .tokenstash/
+/stash-clear
+```
+
+### Stash Reappears After Clearing
+
+**Cause:** Possibly restored from git or backup
+
+**Solution:**
+- Check if `.tokenstash/` is tracked in git
+- Verify no automatic backup/restore scripts are running
+- Ensure you cleared in the correct repository
+
+## Best Practices
+
+### Think Before Clearing
+
+Ask yourself:
+- Can I fix this by editing specific files?
+- Will `/stash-scan --force` solve my problem?
+- Do I need to preserve decision history?
+
+### Backup When Unsure
+
+If there's any doubt:
+
+```bash
+cp -r .tokenstash/ .tokenstash.backup/
+```
+
+### Clear Then Rebuild
+
+After clearing, immediately rebuild:
+
+```bash
+/stash-clear
+# Type: YES
+/stash-scan
+```
+
+This ensures Claude has fresh context for the next session.
+
+### Document Why
+
+If clearing during active development:
+
+```bash
+/stash-clear
+# Type: YES
+
+# In your next commit message:
+git commit -m "Reset TokenStash after major refactor"
+```
+
+This helps collaborators understand the context reset.
+
+## Command Implementation
+
+The command is defined in `commands/stash-clear.md`:
+
+```markdown
+---
+description: "Wipe the TokenStash for the current project (asks for confirmation first)"
+disable-model-invocation: true
+---
+
+Ask the user: "Are you sure you want to wipe .tokenstash/ for this project? Type YES to confirm."
+
+If they confirm with YES:
+1. Delete `.tokenstash/` in the current git repo root
+2. Tell them: "TokenStash cleared. Run /stash-scan to rebuild."
+
+If they don't confirm, do nothing and tell them the stash was not cleared.
+```
+
+<Note>
+The `disable-model-invocation: true` flag means the command logic runs directly without additional LLM processing.
+</Note>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Scan Command" icon="magnifying-glass" href="/commands/stash-scan">
+    Rebuild your stash after clearing
+  </Card>
+  
+  <Card title="Save Command" icon="floppy-disk" href="/commands/stash-save">
+    Start fresh with new session context
+  </Card>
+</CardGroup>

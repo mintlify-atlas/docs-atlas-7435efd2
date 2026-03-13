@@ -1,0 +1,577 @@
+---
+title: File Formats
+description: Technical specification for .tokenstash/ file formats and structure
+---
+
+TokenStash stores cached project context in `.tokenstash/` directories using a structured file format. This reference documents the exact specifications.
+
+## Directory Structure
+
+### Global Stash
+
+```
+~/.claude/tokenstash/
+├── preferences.md    # User preferences (applies to all projects)
+└── rules.md          # Global coding rules
+```
+
+### Project Stash
+
+```
+<repo-root>/.tokenstash/
+├── architecture.md   # High-level codebase overview
+├── decisions.md      # Decision log by session
+├── rules.md          # Project-specific rules
+└── files/            # Per-file summaries
+    ├── src__index.ts.md
+    ├── src__lib__utils.ts.md
+    └── app__api__route.ts.md
+```
+
+<Note>
+**Priority:** Project files override global files. If both `~/.claude/tokenstash/rules.md` and `.tokenstash/rules.md` exist, only the project version is loaded.
+</Note>
+
+## File Specifications
+
+### architecture.md
+
+**Purpose:** High-level codebase structure, key components, patterns, and tech stack.
+
+**Location:** `<repo-root>/.tokenstash/architecture.md`
+
+**Format:**
+
+```markdown
+## Architecture Overview
+[2-4 sentences describing overall structure and approach]
+
+## Key Components
+- `path/to/module`: description of what it does
+- `path/to/module`: description of what it does
+
+## Patterns
+- [notable pattern 1]
+- [notable pattern 2]
+
+## Tech Stack
+- [main technology 1]
+- [main technology 2]
+```
+
+<Expandable title="Example: architecture.md">
+```markdown
+## Architecture Overview
+Next.js 14 application using App Router with TypeScript. API routes handle backend logic, with client components for interactive UI. Data fetching uses server components where possible for optimal performance.
+
+## Key Components
+- `app/`: Next.js App Router pages and layouts
+- `components/`: Reusable React components (client and server)
+- `lib/`: Utility functions and shared business logic
+- `hooks/`: Custom React hooks for client-side state
+- `api/`: Backend API route handlers using edge runtime
+- `types/`: Shared TypeScript type definitions
+
+## Patterns
+- Server Components by default, Client Components only when needed
+- API routes use edge runtime for performance
+- Centralized error handling via error.tsx boundaries
+- Environment variables managed via `.env.local`
+- Tailwind CSS with custom design tokens
+
+## Tech Stack
+- Next.js 14 (React 18)
+- TypeScript 5.3
+- Tailwind CSS 3.4
+- Vercel deployment
+- PostgreSQL via Vercel Postgres
+```
+</Expandable>
+
+<ResponseField name="Architecture Overview" type="section" required>
+  2-4 sentences describing the overall structure and architectural approach
+</ResponseField>
+
+<ResponseField name="Key Components" type="section" required>
+  Bulleted list of main directories/modules with brief descriptions
+</ResponseField>
+
+<ResponseField name="Patterns" type="section" required>
+  Notable patterns, conventions, or architectural decisions
+</ResponseField>
+
+<ResponseField name="Tech Stack" type="section" required>
+  Main technologies, frameworks, and tools
+</ResponseField>
+
+### decisions.md
+
+**Purpose:** Chronological log of decisions made during development sessions.
+
+**Location:** `<repo-root>/.tokenstash/decisions.md`
+
+**Format:**
+
+```markdown
+## YYYY-MM-DD — <one-line session summary>
+
+**Decisions:**
+- [What was decided and why]
+- [Another decision if applicable]
+
+**Files changed:** file1.ts, file2.py, file3.tsx
+
+## YYYY-MM-DD — <another session summary>
+
+**Decisions:**
+- [Decision]
+
+**Files changed:** file4.rs
+```
+
+<Expandable title="Example: decisions.md">
+```markdown
+## 2026-03-13 — Added user authentication system
+
+**Decisions:**
+- Used NextAuth.js instead of custom auth to reduce maintenance burden
+- Stored sessions in Redis for faster lookups and easy horizontal scaling
+- Implemented email + password auth first, OAuth providers will be added later
+- JWT tokens stored in httpOnly cookies for security
+
+**Files changed:** lib/auth.ts, app/api/auth/[...nextauth]/route.ts, middleware.ts
+
+## 2026-03-10 — Refactored API error handling
+
+**Decisions:**
+- Created centralized error handler in lib/errors.ts to standardize API responses
+- All API routes now return consistent JSON error format: {error: string, code: string}
+- Added custom error classes for common cases (NotFoundError, ValidationError, etc.)
+
+**Files changed:** lib/errors.ts, app/api/*/route.ts (12 files)
+
+## 2026-03-08 — Initial project setup
+
+**Decisions:**
+- Chose Next.js 14 with App Router for server components and improved DX
+- TypeScript strict mode enabled from the start
+- Tailwind CSS for styling to iterate quickly
+- Vercel deployment for zero-config edge functions
+
+**Files changed:** package.json, tsconfig.json, tailwind.config.ts, next.config.js
+```
+</Expandable>
+
+<ResponseField name="Date and Summary" type="header" required>
+  Format: `## YYYY-MM-DD — <brief session summary>`
+</ResponseField>
+
+<ResponseField name="Decisions" type="section" required>
+  Bulleted list of what was decided and why (rationale is critical)
+</ResponseField>
+
+<ResponseField name="Files changed" type="section" required>
+  Comma-separated list of files modified during the session
+</ResponseField>
+
+<Note>
+**Append only.** New sessions are added to the end. Never remove old entries unless explicitly cleaning up.
+</Note>
+
+### rules.md
+
+**Purpose:** Project-specific coding rules, conventions, and constraints.
+
+**Locations:**
+- Global: `~/.claude/tokenstash/rules.md` (applies to all projects)
+- Project: `<repo-root>/.tokenstash/rules.md` (overrides global)
+
+**Format:**
+
+Free-form Markdown. Common sections:
+
+```markdown
+## Coding Style
+- [Style rule]
+- [Another style rule]
+
+## Naming Conventions
+- [Convention]
+
+## Architecture Rules
+- [Architectural constraint]
+
+## Forbidden Patterns
+- [Pattern to avoid and why]
+
+## Testing Requirements
+- [Testing rule]
+```
+
+<Expandable title="Example: rules.md">
+```markdown
+## Coding Style
+- Use functional components with hooks, no class components
+- Prefer `const` over `let`, never use `var`
+- Max line length: 100 characters
+- Use explicit return types for all functions
+
+## Naming Conventions
+- React components: PascalCase (e.g., `UserProfile.tsx`)
+- Utility functions: camelCase (e.g., `formatDate`)
+- Constants: UPPER_SNAKE_CASE (e.g., `MAX_RETRY_COUNT`)
+- Types/Interfaces: PascalCase with `I` prefix for interfaces
+
+## Architecture Rules
+- Server components are default, client components must have `"use client"` directive
+- All API routes must validate input with Zod schemas
+- Database queries must use prepared statements (no string interpolation)
+- Never expose environment variables to client code
+
+## Forbidden Patterns
+- No `any` types (use `unknown` if type is truly unknown)
+- No `@ts-ignore` without accompanying comment explaining why
+- No direct DOM manipulation in React components
+- No synchronous blocking operations in API routes
+
+## Testing Requirements
+- All utility functions must have unit tests
+- API routes require integration tests
+- Critical user flows need E2E tests
+- Minimum 80% code coverage for lib/ directory
+```
+</Expandable>
+
+<Note>
+This file functions like an enhanced `CLAUDE.md`. It tells Claude the project-specific rules that must be followed.
+</Note>
+
+### preferences.md
+
+**Purpose:** User-wide preferences that apply to all projects.
+
+**Location:** `~/.claude/tokenstash/preferences.md`
+
+**Format:**
+
+Free-form Markdown. Common sections:
+
+```markdown
+## Communication Style
+- [Preference]
+
+## Code Style
+- [Preference]
+
+## Tools and Workflows
+- [Preference]
+```
+
+<Expandable title="Example: preferences.md">
+```markdown
+## Communication Style
+- Be direct and concise, no unnecessary politeness
+- Explain "why" for non-obvious decisions
+- Flag potential issues proactively
+
+## Code Style
+- Prefer functional programming patterns
+- Explicit over implicit (even if more verbose)
+- Comments only for complex logic, code should be self-documenting
+
+## Tools and Workflows
+- Use pnpm for package management, not npm or yarn
+- Run tests before committing
+- Prefer smaller, focused commits over large changesets
+```
+</Expandable>
+
+### files/*.md (File Summaries)
+
+**Purpose:** Per-file summaries (3-5 lines) to help Claude skip re-reading files.
+
+**Location:** `<repo-root>/.tokenstash/files/<flattened-path>.md`
+
+**Naming Convention:**
+
+Replace `/` with `__` in the file path:
+
+```
+src/lib/utils.ts      → src__lib__utils.ts.md
+app/api/route.ts      → app__api__route.ts.md
+components/Button.tsx → components__Button.tsx.md
+```
+
+**Format:**
+
+```markdown
+**Purpose:** One sentence — what this file does.
+**Key exports:** List the main functions/classes/constants exported.
+**Patterns:** Any notable patterns (e.g. "uses factory pattern", "singleton").
+**Last updated:** YYYY-MM-DD
+```
+
+<Expandable title="Example: src__lib__utils.ts.md">
+```markdown
+**Purpose:** Utility functions for string manipulation and data formatting.
+**Key exports:** formatDate, slugify, truncate, parseMarkdown
+**Patterns:** Pure functions, no side effects, all functions have explicit return types
+**Last updated:** 2026-03-13
+```
+</Expandable>
+
+<Expandable title="Example: components__Button.tsx.md">
+```markdown
+**Purpose:** Reusable button component with variants and size options.
+**Key exports:** Button (default), ButtonProps
+**Patterns:** Uses cva for variant composition, forwards ref for accessibility
+**Last updated:** 2026-03-10
+```
+</Expandable>
+
+<ResponseField name="Purpose" type="string" required>
+  One sentence describing what the file does
+</ResponseField>
+
+<ResponseField name="Key exports" type="string" required>
+  Main functions, classes, constants, or components exported
+</ResponseField>
+
+<ResponseField name="Patterns" type="string" required>
+  Notable patterns, architectural decisions, or implementation details
+</ResponseField>
+
+<ResponseField name="Last updated" type="date" required>
+  Date in `YYYY-MM-DD` format when summary was last updated
+</ResponseField>
+
+<Note>
+**Keep it under 5 lines.** The goal is to help Claude decide whether to read the file, not to fully understand it.
+</Note>
+
+### Edge Cases
+
+<ResponseField name="Boilerplate files" type="string">
+  Do NOT create summaries for files with only imports, type definitions, or empty content
+</ResponseField>
+
+<ResponseField name="Deleted files" type="string">
+  Remove the corresponding `.md` summary when a source file is deleted
+</ResponseField>
+
+<ResponseField name="Large files" type="string">
+  For files over 500 lines, include a note in the summary: "(Large file, 1200 lines)"
+</ResponseField>
+
+## Context Injection Format
+
+At session start, TokenStash injects cached context wrapped in `<tokenstash>` tags:
+
+```xml
+<tokenstash>
+## Global: preferences.md
+[preferences content]
+
+## Global: rules.md
+[global rules content]
+
+## Project: architecture.md
+[architecture content]
+
+## Project: decisions.md
+[decisions content]
+
+## Project: rules.md
+[project rules content]
+
+## File Summaries (87 files cached)
+### src/index.ts
+**Purpose:** Main entry point for the application.
+**Key exports:** startServer, config
+**Patterns:** Uses async/await for initialization
+**Last updated:** 2026-03-10
+
+### src/lib/utils.ts
+**Purpose:** Utility functions for string manipulation and data formatting.
+**Key exports:** formatDate, slugify, truncate
+**Patterns:** Pure functions, no side effects
+**Last updated:** 2026-03-12
+
+[... more file summaries ...]
+</tokenstash>
+```
+
+### Loading Order
+
+1. **Global preferences** (`~/.claude/tokenstash/preferences.md`)
+2. **Global rules** (`~/.claude/tokenstash/rules.md`)
+3. **Project architecture** (`.tokenstash/architecture.md`)
+4. **Project decisions** (`.tokenstash/decisions.md`)
+5. **Project rules** (`.tokenstash/rules.md`) — overrides global rules
+6. **File summaries** (`.tokenstash/files/*.md`)
+
+<Note>
+If a file exists in both global and project stash, only the project version is loaded (project takes priority).
+</Note>
+
+## File Operations
+
+### Creating Files
+
+```bash
+# Create directory structure
+mkdir -p .tokenstash/files
+
+# Write architecture overview
+cat > .tokenstash/architecture.md << 'EOF'
+## Architecture Overview
+...
+EOF
+
+# Write file summary
+cat > .tokenstash/files/src__lib__utils.ts.md << 'EOF'
+**Purpose:** ...
+**Key exports:** ...
+**Patterns:** ...
+**Last updated:** 2026-03-13
+EOF
+```
+
+### Updating Files
+
+<Note>
+**architecture.md**: Overwrite completely when updating (rewrite entire file)
+
+**decisions.md**: Append only (add new entries at the end)
+
+**rules.md**: Overwrite completely when updating
+
+**files/*.md**: Overwrite individual summaries when files change
+</Note>
+
+### Deleting Files
+
+```bash
+# Delete entire project stash
+rm -rf .tokenstash/
+
+# Delete specific file summary
+rm .tokenstash/files/src__lib__utils.ts.md
+```
+
+## Encoding and Escaping
+
+### JSON Escaping
+
+When injecting context into Claude (via hooks), content must be JSON-escaped:
+
+```bash
+escape_for_json() {
+    local s="$1"
+    s="${s//\\/\\\\}"        # Escape backslashes
+    s="${s//\"/\\\"}"        # Escape quotes
+    s="${s//$'\n'/\\n}"      # Escape newlines
+    s="${s//$'\r'/\\r}"      # Escape carriage returns
+    s="${s//$'\t'/\\t}"      # Escape tabs
+    printf '%s' "$s"
+}
+```
+
+### File Path Flattening
+
+Convert file paths to valid filenames:
+
+```bash
+# In bash:
+flat_path=$(echo "$file_path" | tr '/' '_' | sed 's/__*/__/g')
+
+# Examples:
+src/lib/utils.ts      → src__lib__utils.ts
+app/api/route.ts      → app__api__route.ts
+components/ui/Button  → components__ui__Button
+```
+
+## Git Integration
+
+### .gitignore
+
+TokenStash summaries contain no code, only summaries. It's safe to commit, but many users prefer to keep it local:
+
+```gitignore .gitignore
+# TokenStash cache (optional)
+.tokenstash/
+```
+
+### Repository Detection
+
+TokenStash finds the project root using Git:
+
+```bash
+git rev-parse --show-toplevel
+```
+
+If not in a Git repository, TokenStash cannot determine the project root and will not create a project stash.
+
+## Testing Overrides
+
+For testing purposes, stash directories can be overridden with environment variables:
+
+<ResponseField name="TOKENSTASH_TEST_DIR" type="string">
+  Override global stash directory (default: `~/.claude/tokenstash`)
+  
+  ```bash
+  export TOKENSTASH_TEST_DIR="/tmp/test-stash"
+  ```
+</ResponseField>
+
+<ResponseField name="TOKENSTASH_TEST_PROJECT_DIR" type="string">
+  Override project stash directory (default: `<git-root>/.tokenstash`)
+  
+  ```bash
+  export TOKENSTASH_TEST_PROJECT_DIR="/tmp/test-project/.tokenstash"
+  ```
+</ResponseField>
+
+## File Size Limits
+
+<ResponseField name="Individual file summaries" type="string">
+  Maximum 5 lines (enforced by skill instructions)
+</ResponseField>
+
+<ResponseField name="architecture.md" type="string">
+  Recommended 20-40 lines (no hard limit)
+</ResponseField>
+
+<ResponseField name="decisions.md" type="string">
+  No limit (grows over project lifetime)
+</ResponseField>
+
+<ResponseField name="rules.md" type="string">
+  Recommended 20-50 lines (no hard limit)
+</ResponseField>
+
+<ResponseField name="Total stash size" type="string">
+  No limit, but keep file summaries concise to avoid context bloat
+</ResponseField>
+
+## Best Practices
+
+<Card title="Keep summaries concise" icon="compress">
+  File summaries should be 3-5 lines maximum. Claude needs to decide whether to read the file, not understand it fully.
+</Card>
+
+<Card title="Update architecture.md sparingly" icon="pencil">
+  Only rewrite when structure actually changes. Don't update for minor tweaks.
+</Card>
+
+<Card title="Log decisions, not actions" icon="book">
+  `decisions.md` should capture *why* decisions were made, not just *what* was done.
+</Card>
+
+<Card title="Use rules.md as enhanced CLAUDE.md" icon="gavel">
+  Project-specific rules that Claude must follow. Think: constraints, conventions, forbidden patterns.
+</Card>
+
+<Card title="Flatten file paths consistently" icon="folder">
+  Always use `__` to replace `/` in file paths. Consistency matters for lookups.
+</Card>

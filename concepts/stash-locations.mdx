@@ -1,0 +1,292 @@
+---
+title: "Stash Locations"
+description: "Understand global vs project stash and how priority works"
+---
+
+## Two Stash Levels
+
+TokenStash maintains two separate stash locations with different scopes:
+
+<CardGroup cols={2}>
+  <Card title="Global Stash" icon="globe">
+    `~/.claude/tokenstash/`
+    
+    Applies to **all projects**. Use for personal preferences and universal rules.
+  </Card>
+  <Card title="Project Stash" icon="folder">
+    `<repo-root>/.tokenstash/`
+    
+    Applies to **one project**. Contains architecture, decisions, and file summaries.
+  </Card>
+</CardGroup>
+
+## Global Stash
+
+### Location
+
+```bash
+~/.claude/tokenstash/
+```
+
+This directory lives in your home directory and persists across all Claude Code sessions.
+
+### What Goes Here
+
+<Accordion title="preferences.md">
+  Personal preferences that apply to all projects:
+
+  ```markdown
+  # My Coding Preferences
+
+  ## Style
+  - Use single quotes for strings
+  - Prefer arrow functions over function declarations
+  - Always include JSDoc comments for public APIs
+
+  ## Testing
+  - Write tests first (TDD approach)
+  - Use descriptive test names ("it should...")
+
+  ## Git
+  - Write commit messages in present tense
+  - Reference issue numbers when applicable
+  ```
+
+  <Tip>
+  Think of `preferences.md` as your personal CLAUDE.md that travels with you across all projects.
+  </Tip>
+</Accordion>
+
+<Accordion title="rules.md">
+  Universal rules you want Claude to follow everywhere:
+
+  ```markdown
+  # Global Rules
+
+  ## Communication
+  - Be concise — no unnecessary explanations
+  - Show code first, explain only if asked
+
+  ## Code Generation
+  - Always add error handling
+  - Log important state changes
+  - Use TypeScript strict mode when available
+
+  ## Security
+  - Never commit secrets or API keys
+  - Validate all user inputs
+  - Use environment variables for config
+  ```
+
+  <Note>
+  Global `rules.md` can be overridden by project-specific `rules.md`.
+  </Note>
+</Accordion>
+
+### When It's Loaded
+
+The global stash loads at **every session start**, before the project stash:
+
+```bash hooks/session-start:36-43
+# Load global stash
+if [ -d "$GLOBAL_STASH_DIR" ]; then
+    for f in preferences.md rules.md; do
+        fpath="$GLOBAL_STASH_DIR/$f"
+        if [ -f "$fpath" ]; then
+            context+="## Global: $f\n$(cat "$fpath")\n\n"
+        fi
+    done
+fi
+```
+
+## Project Stash
+
+### Location
+
+TokenStash finds the project stash by locating the git repository root:
+
+```bash hooks/session-start:18-20
+GIT_ROOT=$(git -C "${PWD}" rev-parse --show-toplevel 2>/dev/null || echo "")
+PROJECT_STASH_DIR="${GIT_ROOT}/.tokenstash"
+```
+
+If you're working in `/home/user/projects/myapp/src/components/`, the stash is:
+
+```bash
+/home/user/projects/myapp/.tokenstash/
+```
+
+<Info>
+TokenStash uses the **git repository root**, not the current working directory. This ensures all team members share the same stash location.
+</Info>
+
+### What Goes Here
+
+The project stash contains **project-specific context**:
+
+| File | Purpose |
+|------|--------|
+| `architecture.md` | High-level codebase overview — structure, patterns, key components |
+| `decisions.md` | Decision log — what was decided each session and why |
+| `rules.md` | Project-specific rules (overrides global rules) |
+| `files/<path>.md` | Per-file summaries (3-5 lines each) |
+
+### When It's Loaded
+
+The project stash loads **after** the global stash at session start:
+
+```bash hooks/session-start:46-64
+# Load project stash (takes priority)
+if [ -d "$PROJECT_STASH_DIR" ]; then
+    for f in architecture.md decisions.md rules.md; do
+        fpath="$PROJECT_STASH_DIR/$f"
+        if [ -f "$fpath" ]; then
+            context+="## Project: $f\n$(cat "$fpath")\n\n"
+        fi
+    done
+    # Load file summaries
+    if [ -d "$PROJECT_STASH_DIR/files" ]; then
+        file_count=$(find "$PROJECT_STASH_DIR/files" -name "*.md" | wc -l | tr -d ' ')
+        if [ "$file_count" -gt 0 ]; then
+            context+="## File Summaries ($file_count files cached)\n"
+            for f in "$PROJECT_STASH_DIR/files/"*.md; do
+                [ -f "$f" ] || continue
+                fname=$(basename "$f" .md | tr '__' '/')
+                context+="### $fname\n$(cat "$f")\n\n"
+            done
+        fi
+    fi
+fi
+```
+
+## Priority System
+
+When both global and project stash exist, **project takes precedence**:
+
+<Steps>
+  <Step title="Load Global">
+    Read `~/.claude/tokenstash/preferences.md` and `rules.md`
+  </Step>
+  <Step title="Load Project">
+    Read `<repo>/.tokenstash/architecture.md`, `decisions.md`, `rules.md`, and all `files/*.md`
+  </Step>
+  <Step title="Inject Context">
+    Combine both into Claude's context. If a file exists in both, project wins.
+  </Step>
+</Steps>
+
+### Example: Overriding Global Rules
+
+**Global stash** (`~/.claude/tokenstash/rules.md`):
+```markdown
+# Global Rules
+- Use single quotes for strings
+- Prefer arrow functions
+```
+
+**Project stash** (`myapp/.tokenstash/rules.md`):
+```markdown
+# MyApp Rules
+- Use double quotes for strings (company standard)
+- Use function declarations for top-level functions
+```
+
+Result: In the `myapp` project, Claude uses **double quotes** and **function declarations**, overriding your global preferences.
+
+<Tip>
+Use global stash for personal defaults, project stash for team conventions.
+</Tip>
+
+## No Stash Found
+
+If neither global nor project stash exists, you'll see:
+
+```bash hooks/session-start:67-69
+if [ -z "$context" ]; then
+    context="TokenStash: No stash found. Run /stash-scan to index this project."
+fi
+```
+
+This reminder prompts you to run `/stash-scan` to bootstrap the project stash.
+
+## Working Across Projects
+
+<Accordion title="Scenario 1: New Project">
+  You're starting work on a new repository:
+
+  1. Claude loads your global stash (preferences, rules)
+  2. No project stash exists yet
+  3. Run `/stash-scan` to index the codebase
+  4. Project stash is created at `<repo>/.tokenstash/`
+  5. Next session: Claude loads both global + project stash
+</Accordion>
+
+<Accordion title="Scenario 2: Multiple Projects">
+  You work on projects A and B:
+
+  ```
+  ~/projects/project-a/.tokenstash/  (Stash A)
+  ~/projects/project-b/.tokenstash/  (Stash B)
+  ~/.claude/tokenstash/              (Global)
+  ```
+
+  - In project A: Claude loads Global + Stash A
+  - In project B: Claude loads Global + Stash B
+  - Each project has isolated context
+</Accordion>
+
+<Accordion title="Scenario 3: Shared Team Stash">
+  Your team commits `.tokenstash/` to git:
+
+  1. Alice runs `/stash-scan` and commits the stash
+  2. Bob pulls the repo and gets the stash automatically
+  3. Bob's Claude starts with Alice's cached context
+  4. Bob runs `/stash-save` and updates decisions/architecture
+  5. The stash evolves with the project over time
+
+  <Note>
+  If you commit the stash, make sure `decisions.md` doesn't contain sensitive info (API keys, credentials, etc.)
+  </Note>
+</Accordion>
+
+## Testing Overrides
+
+For testing purposes, you can override stash locations with environment variables:
+
+```bash hooks/session-start:8-20
+# Support test overrides
+if [ -n "${TOKENSTASH_TEST_DIR:-}" ]; then
+    GLOBAL_STASH_DIR="${TOKENSTASH_TEST_DIR}/global"
+else
+    GLOBAL_STASH_DIR="${HOME}/.claude/tokenstash"
+fi
+
+# Find project stash: use test override or find git repo root
+if [ -n "${TOKENSTASH_TEST_PROJECT_DIR:-}" ]; then
+    PROJECT_STASH_DIR="$TOKENSTASH_TEST_PROJECT_DIR"
+else
+    GIT_ROOT=$(git -C "${PWD}" rev-parse --show-toplevel 2>/dev/null || echo "")
+    PROJECT_STASH_DIR="${GIT_ROOT}/.tokenstash"
+fi
+```
+
+This allows automated tests to use isolated stash directories without polluting your real stash.
+
+## Summary
+
+<Card title="Best Practices" icon="lightbulb">
+  **Global stash:**
+  - Personal coding preferences
+  - Universal rules (security, style, etc.)
+  - Created once, applies everywhere
+
+  **Project stash:**
+  - Architecture overview
+  - Decision history
+  - File summaries
+  - Team conventions
+  - Created per project, shared with team (optional)
+
+  **Priority:**
+  Project always wins when both exist.
+</Card>
